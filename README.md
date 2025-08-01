@@ -10,7 +10,7 @@ A Python application that automatically adds YouTube video summaries to a Notion
 - 📝 **Markdown to Notion**: Converts markdown summaries to Notion's rich text format
 - 🎨 **Rich Formatting**: Supports headers, bullet points, numbered lists, bold, and italic text
 - 🖼️ **Cover Images**: Automatically adds video thumbnails as page covers
-- 🧪 **Comprehensive Testing**: 40+ unit tests ensuring reliable functionality
+- 🧪 **Comprehensive Testing**: 50+ unit tests ensuring reliable functionality
 - 📁 **Professional Structure**: Organized, maintainable codebase following Python best practices
 
 ## Project Structure
@@ -152,6 +152,7 @@ The application automatically detects and enhances timestamps in your markdown c
 2. **Parsing**: Converts time to seconds (supports MM:SS and HH:MM:SS)
 3. **Linking**: Creates YouTube URLs with `&t=XXXs` parameter
 4. **Integration**: Works with both standard and short YouTube URLs
+5. **Rich Text**: Timestamps become clickable links in all contexts (headers, paragraphs, lists)
 
 ### Example
 ```markdown
@@ -188,6 +189,7 @@ The markdown converter supports:
   - H3+ (`###`, `####`, etc.) → Notion Heading 3 (Notion only supports 3 levels)
 - **Lists**: `- item` and `1. item` → Notion list blocks
 - **Formatting**: `**bold**` and `*italic*` → Notion rich text
+- **Links**: `[text](url)` → Clickable Notion links (supports formatting within links)
 - **Timestamps**: `[8:05]`, `[8:05-8:24]`, `[0:01-0:07, 0:56-1:21]` → Clickable YouTube timestamp links
 - **Paragraphs**: Regular text → Notion paragraph blocks
 

@@ -8,36 +8,93 @@ from urllib.parse import urlparse, parse_qs
 
 
 def parse_rich_text(text):
-    """Parse text with markdown formatting to Notion rich text format."""
+    """Parse text with markdown formatting to Notion rich text format.
+    
+    Supports:
+    - Links: [text](url)
+    - Bold: **text**
+    - Italic: *text*
+    """
     rich_text = []
+    i = 0
     
-    # Simple regex patterns for bold and italic
-    parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', text)
-    
-    for part in parts:
-        if not part:
-            continue
+    while i < len(text):
+        # Look for markdown link pattern [text](url)
+        link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', text[i:])
+        if link_match:
+            link_text = link_match.group(1)
+            link_url = link_match.group(2)
             
-        if part.startswith('**') and part.endswith('**'):
-            # Bold text
+            # Check if link text has formatting
+            if '**' in link_text and link_text.startswith('**') and link_text.endswith('**'):
+                # Bold link
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": link_text[2:-2], "link": {"url": link_url}},
+                    "annotations": {"bold": True}
+                })
+            elif '*' in link_text and link_text.startswith('*') and link_text.endswith('*'):
+                # Italic link
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": link_text[1:-1], "link": {"url": link_url}},
+                    "annotations": {"italic": True}
+                })
+            else:
+                # Regular link
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": link_text, "link": {"url": link_url}}
+                })
+            
+            i += link_match.end()
+            continue
+        
+        # Look for bold text **text**
+        bold_match = re.match(r'\*\*([^*]+)\*\*', text[i:])
+        if bold_match:
             rich_text.append({
                 "type": "text",
-                "text": {"content": part[2:-2]},
+                "text": {"content": bold_match.group(1)},
                 "annotations": {"bold": True}
             })
-        elif part.startswith('*') and part.endswith('*'):
-            # Italic text
-            rich_text.append({
-                "type": "text", 
-                "text": {"content": part[1:-1]},
-                "annotations": {"italic": True}
-            })
-        else:
-            # Regular text
+            i += bold_match.end()
+            continue
+        
+        # Look for italic text *text*
+        italic_match = re.match(r'\*([^*]+)\*', text[i:])
+        if italic_match:
             rich_text.append({
                 "type": "text",
-                "text": {"content": part}
+                "text": {"content": italic_match.group(1)},
+                "annotations": {"italic": True}
             })
+            i += italic_match.end()
+            continue
+        
+        # Regular character - find the next special character or end of string
+        next_special = len(text)
+        for pattern in [r'\[', r'\*\*', r'\*']:
+            match = re.search(pattern, text[i:])
+            if match:
+                next_special = min(next_special, i + match.start())
+        
+        if next_special > i:
+            # Add regular text
+            regular_text = text[i:next_special]
+            if regular_text:
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": regular_text}
+                })
+            i = next_special
+        else:
+            # Single character that didn't match any pattern
+            rich_text.append({
+                "type": "text",
+                "text": {"content": text[i]}
+            })
+            i += 1
     
     return rich_text
 
@@ -72,7 +129,7 @@ def markdown_to_notion_blocks(markdown_text):
                     "object": "block",
                     "type": "heading_1",
                     "heading_1": {
-                        "rich_text": [{"type": "text", "text": {"content": header_text}}]
+                        "rich_text": parse_rich_text(header_text)
                     }
                 })
             elif header_level == 2:
@@ -80,7 +137,7 @@ def markdown_to_notion_blocks(markdown_text):
                     "object": "block",
                     "type": "heading_2", 
                     "heading_2": {
-                        "rich_text": [{"type": "text", "text": {"content": header_text}}]
+                        "rich_text": parse_rich_text(header_text)
                     }
                 })
             elif header_level >= 3:
@@ -89,7 +146,7 @@ def markdown_to_notion_blocks(markdown_text):
                     "object": "block",
                     "type": "heading_3",
                     "heading_3": {
-                        "rich_text": [{"type": "text", "text": {"content": header_text}}]
+                        "rich_text": parse_rich_text(header_text)
                     }
                 })
         # Handle bullet points
