@@ -6,10 +6,11 @@ A Python application that automatically adds YouTube video summaries to a Notion
 
 - 🎥 **YouTube Integration**: Processes video metadata (title, URL, channel, cover image)
 - 📺 **Embedded Videos**: Automatically embeds YouTube videos at the top of each page
+- ⏰ **Smart Timestamps**: Converts timestamps like `[8:05]` or `[8:05-8:24]` to clickable YouTube links
 - 📝 **Markdown to Notion**: Converts markdown summaries to Notion's rich text format
 - 🎨 **Rich Formatting**: Supports headers, bullet points, numbered lists, bold, and italic text
 - 🖼️ **Cover Images**: Automatically adds video thumbnails as page covers
-- 🧪 **Comprehensive Testing**: 22+ unit tests ensuring reliable functionality
+- 🧪 **Comprehensive Testing**: 40+ unit tests ensuring reliable functionality
 - 📁 **Professional Structure**: Organized, maintainable codebase following Python best practices
 
 ## Project Structure
@@ -92,7 +93,10 @@ Your Notion database should have these properties:
 Each page will contain:
 1. **Embedded YouTube video** at the top for easy viewing
 2. **Visual divider** for clean separation
-3. **Full markdown summary** converted to properly formatted Notion blocks (headers, lists, bold/italic text, etc.)
+3. **Full markdown summary** with smart features:
+   - **Clickable timestamps** that jump to specific moments in the video
+   - **Rich formatting** (headers, lists, bold/italic text, etc.)
+   - **Proper Notion block structure** for optimal readability
 
 ## Example Data
 
@@ -101,6 +105,7 @@ The application includes example data from a YouTube video about AI chunking str
 - **Embedded YouTube video** at the top for immediate viewing
 - **Visual divider** separating video from content
 - **Formatted summary** with:
+  - **Clickable timestamps** that jump to video moments
   - Multiple heading levels (H1-H6 supported)
   - Bullet points and numbered lists
   - Bold and italic text formatting
@@ -133,6 +138,31 @@ The test runner will automatically:
 - Try to use pytest if available
 - Fall back to running tests individually if pytest isn't installed
 
+## Smart Timestamp Features
+
+The application automatically detects and enhances timestamps in your markdown content:
+
+### Supported Formats
+- **Single timestamp**: `[8:05]` → Links to 8 minutes 5 seconds
+- **Time range**: `[8:05-8:24]` → Links to start time (8:05)
+- **Multiple timestamps**: `[0:01-0:07, 0:56-1:21]` → Creates separate links for each
+
+### How It Works
+1. **Detection**: Finds timestamp patterns in square brackets
+2. **Parsing**: Converts time to seconds (supports MM:SS and HH:MM:SS)
+3. **Linking**: Creates YouTube URLs with `&t=XXXs` parameter
+4. **Integration**: Works with both standard and short YouTube URLs
+
+### Example
+```markdown
+#### The High Cost of Bad Chunking [0:01-0:07, 0:56-1:21]
+```
+
+Becomes:
+```markdown
+#### The High Cost of Bad Chunking [0:01-0:07](https://youtube.com/watch?v=VIDEO_ID&t=1s), [0:56-1:21](https://youtube.com/watch?v=VIDEO_ID&t=56s)
+```
+
 ## Development
 
 ### Project Structure
@@ -158,6 +188,7 @@ The markdown converter supports:
   - H3+ (`###`, `####`, etc.) → Notion Heading 3 (Notion only supports 3 levels)
 - **Lists**: `- item` and `1. item` → Notion list blocks
 - **Formatting**: `**bold**` and `*italic*` → Notion rich text
+- **Timestamps**: `[8:05]`, `[8:05-8:24]`, `[0:01-0:07, 0:56-1:21]` → Clickable YouTube timestamp links
 - **Paragraphs**: Regular text → Notion paragraph blocks
 
 ## Troubleshooting

@@ -2,7 +2,7 @@
 Notion database operations.
 """
 
-from utils.markdown_converter import markdown_to_notion_blocks
+from utils.markdown_converter import markdown_to_notion_blocks, enrich_timestamps_with_links
 
 
 def find_database_by_name(notion, database_name, parent_page_name=None):
@@ -37,13 +37,17 @@ def add_youtube_entry(notion, database_id, title, summary, video_url, channel, c
     Creates a page with:
     1. YouTube video embedded at the top
     2. A divider for visual separation
-    3. The summary converted from markdown to formatted Notion blocks
+    3. The summary with timestamps converted to clickable YouTube links
+    4. All content converted from markdown to formatted Notion blocks
     
-    No raw summary property is created - only the formatted content.
+    Timestamps like [8:05] or [8:05-8:24] become clickable links that jump to that time in the video.
     """
     try:
-        # Convert markdown summary to Notion blocks
-        summary_blocks = markdown_to_notion_blocks(summary)
+        # Enrich timestamps in summary with YouTube links
+        enriched_summary = enrich_timestamps_with_links(summary, video_url)
+        
+        # Convert enriched markdown summary to Notion blocks
+        summary_blocks = markdown_to_notion_blocks(enriched_summary)
         
         # Create YouTube embed block
         youtube_embed = {

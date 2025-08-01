@@ -35,7 +35,8 @@ def run_tests():
         test_files = [
             'tests/test_markdown_converter.py',
             'tests/test_integration.py',
-            'tests/test_notion_operations.py'
+            'tests/test_notion_operations.py',
+            'tests/test_timestamp_enrichment.py'
         ]
         
         for test_file in test_files:
