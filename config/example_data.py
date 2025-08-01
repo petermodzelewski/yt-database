@@ -13,7 +13,7 @@ The AI retrieved only the first chunk and incorrectly stated that Party A fully 
 
 For companies implementing Retrieval-Augmented Generation (RAG) systems, the most critical question is not which embedding model to use, but "how should we chunk our data?" [1:43-1:53]. Proper chunking is the first line of defense against model hallucinations. When an AI is fed incomplete information from poorly divided chunks, it will attempt to fill in the gaps, leading to fabrications [1:54-2:00].
 
-Here’s how the process works and where it can go wrong:
+Here's how the process works and where it can go wrong:
 *   **The Retrieval Process** [2:16-2:31]: When a user asks a question, the AI system retrieves the 3-5 most relevant chunks of data based on semantic similarity to formulate an answer.
 *   **The Problem of Split Answers** [2:32-2:41]: If the complete, true answer is split across multiple chunks, and the AI only retrieves some of them, the response will be incomplete and likely incorrect.
 
