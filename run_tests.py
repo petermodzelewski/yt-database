@@ -32,11 +32,14 @@ def run_tests():
         
         # Fallback to running tests individually
         test_files = [
+            'tests/test_main.py',
             'tests/test_markdown_converter.py',
             'tests/test_integration.py',
             'tests/test_notion_operations.py',
             'tests/test_timestamp_enrichment.py',
-            'tests/test_end_to_end_timestamps.py'
+            'tests/test_end_to_end_timestamps.py',
+            'tests/test_error_handling.py',
+            'tests/test_performance.py'
         ]
         
         for test_file in test_files:

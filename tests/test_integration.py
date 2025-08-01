@@ -29,7 +29,6 @@ def test_example_data_conversion():
     assert first_block["type"] == "heading_3", f"First block should be heading_3, got {first_block['type']}"
     
     print("✅ Integration test passed!")
-    return blocks
 
 
 if __name__ == "__main__":
