@@ -101,18 +101,30 @@ The application includes example data from a YouTube video about AI chunking str
 
 ## Testing
 
+First, ensure all dependencies are installed:
+
+```bash
+pip install -r requirements.txt
+```
+
 Run the comprehensive test suite:
 
 ```bash
-# Unit tests for markdown conversion
-python tests/test_markdown_converter.py
+# Easy way - use the test runner (handles path setup automatically)
+python run_tests.py
 
-# Integration tests with example data
-python tests/test_integration.py
+# Manual way with proper Python path setup:
+# Windows PowerShell:
+$env:PYTHONPATH="src;config"; python -m pytest tests/ -v
 
-# All tests with pytest (if installed)
-pytest tests/
+# Unix/Linux/Mac:
+PYTHONPATH=src:config python -m pytest tests/ -v
 ```
+
+The test runner will automatically:
+- Set up the correct Python path
+- Try to use pytest if available
+- Fall back to running tests individually if pytest isn't installed
 
 ## Development
 

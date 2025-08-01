@@ -4,12 +4,6 @@ Tests the conversion of markdown text to Notion rich text blocks.
 """
 
 import unittest
-import sys
-import os
-
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from utils.markdown_converter import parse_rich_text, markdown_to_notion_blocks
 
 

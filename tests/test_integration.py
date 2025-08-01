@@ -2,13 +2,6 @@
 Integration test to verify the markdown converter works with EXAMPLE_DATA.
 """
 
-import sys
-import os
-
-# Add src and config to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'config'))
-
 from utils.markdown_converter import markdown_to_notion_blocks
 from example_data import EXAMPLE_DATA
 
