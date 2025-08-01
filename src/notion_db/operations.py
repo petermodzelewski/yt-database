@@ -32,7 +32,11 @@ def find_database_by_name(notion, database_name, parent_page_name=None):
 
 
 def add_youtube_entry(notion, database_id, title, summary, video_url, channel, cover_url):
-    """Add a new entry to the YT Summaries database."""
+    """Add a new entry to the YT Summaries database.
+    
+    The summary is converted from markdown to Notion blocks and added as page content.
+    No raw summary property is created - only the formatted content.
+    """
     try:
         # Convert markdown summary to Notion blocks
         summary_blocks = markdown_to_notion_blocks(summary)
@@ -55,14 +59,6 @@ def add_youtube_entry(notion, database_id, title, summary, video_url, channel, c
                     {
                         "type": "text", 
                         "text": {"content": channel}
-                    }
-                ]
-            },
-            "Summary": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {"content": summary[:2000]}  # Notion has a 2000 char limit for rich_text properties
                     }
                 ]
             }

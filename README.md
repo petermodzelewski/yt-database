@@ -54,10 +54,11 @@ NOTION_TOKEN=your_notion_integration_token_here
 
 Create a Notion database with these properties:
 - **Title** (Title)
-- **Summary** (Rich Text)
 - **Video URL** (URL)
 - **Channel** (Rich Text)
 - **Tags** (Multi-select) - optional
+
+The full summary content will be added as the page content with proper markdown formatting.
 
 ### 4. Run the Application
 
@@ -83,12 +84,11 @@ Your Notion database should have these properties:
 | Property Name | Type | Description |
 |---------------|------|-------------|
 | Title | Title | Video title |
-| Summary | Rich Text | Brief summary (truncated to 2000 chars) |
 | Video URL | URL | YouTube video link |
 | Channel | Rich Text | Channel name |
 | Tags | Multi-select | Optional tags |
 
-The full markdown summary will be added as the page content with proper formatting.
+The full markdown summary will be added as the page content with proper formatting (headers, lists, bold/italic text, etc.).
 
 ## Example Data
 
