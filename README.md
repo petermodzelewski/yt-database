@@ -39,7 +39,7 @@ youtube-notion-integration/
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - Notion account with API access
 - A Notion database named "YT Summaries" in a page called "YouTube Knowledge Base"
 
