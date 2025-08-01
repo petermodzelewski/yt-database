@@ -5,10 +5,11 @@ A Python application that automatically adds YouTube video summaries to a Notion
 ## Features
 
 - 🎥 **YouTube Integration**: Processes video metadata (title, URL, channel, cover image)
+- 📺 **Embedded Videos**: Automatically embeds YouTube videos at the top of each page
 - 📝 **Markdown to Notion**: Converts markdown summaries to Notion's rich text format
 - 🎨 **Rich Formatting**: Supports headers, bullet points, numbered lists, bold, and italic text
 - 🖼️ **Cover Images**: Automatically adds video thumbnails as page covers
-- 🧪 **Comprehensive Testing**: 17+ unit tests ensuring reliable markdown conversion
+- 🧪 **Comprehensive Testing**: 22+ unit tests ensuring reliable functionality
 - 📁 **Professional Structure**: Organized, maintainable codebase following Python best practices
 
 ## Project Structure
@@ -88,16 +89,22 @@ Your Notion database should have these properties:
 | Channel | Rich Text | Channel name |
 | Tags | Multi-select | Optional tags |
 
-The full markdown summary will be added as the page content with proper formatting (headers, lists, bold/italic text, etc.).
+Each page will contain:
+1. **Embedded YouTube video** at the top for easy viewing
+2. **Visual divider** for clean separation
+3. **Full markdown summary** converted to properly formatted Notion blocks (headers, lists, bold/italic text, etc.)
 
 ## Example Data
 
-The application includes example data from a YouTube video about AI chunking strategies. Run the app to see how it converts markdown content with:
+The application includes example data from a YouTube video about AI chunking strategies. Run the app to see how it creates a complete Notion page with:
 
-- Multiple heading levels
-- Bullet points and numbered lists
-- Bold and italic text formatting
-- Complex nested content
+- **Embedded YouTube video** at the top for immediate viewing
+- **Visual divider** separating video from content
+- **Formatted summary** with:
+  - Multiple heading levels (H1-H6 supported)
+  - Bullet points and numbered lists
+  - Bold and italic text formatting
+  - Complex nested content
 
 ## Testing
 

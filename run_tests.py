@@ -34,7 +34,8 @@ def run_tests():
         # Fallback to running tests individually
         test_files = [
             'tests/test_markdown_converter.py',
-            'tests/test_integration.py'
+            'tests/test_integration.py',
+            'tests/test_notion_operations.py'
         ]
         
         for test_file in test_files:

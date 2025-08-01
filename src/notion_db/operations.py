@@ -2,7 +2,7 @@
 Notion database operations.
 """
 
-from src.utils.markdown_converter import markdown_to_notion_blocks
+from utils.markdown_converter import markdown_to_notion_blocks
 
 
 def find_database_by_name(notion, database_name, parent_page_name=None):
@@ -34,12 +34,35 @@ def find_database_by_name(notion, database_name, parent_page_name=None):
 def add_youtube_entry(notion, database_id, title, summary, video_url, channel, cover_url):
     """Add a new entry to the YT Summaries database.
     
-    The summary is converted from markdown to Notion blocks and added as page content.
+    Creates a page with:
+    1. YouTube video embedded at the top
+    2. A divider for visual separation
+    3. The summary converted from markdown to formatted Notion blocks
+    
     No raw summary property is created - only the formatted content.
     """
     try:
         # Convert markdown summary to Notion blocks
         summary_blocks = markdown_to_notion_blocks(summary)
+        
+        # Create YouTube embed block
+        youtube_embed = {
+            "object": "block",
+            "type": "embed",
+            "embed": {
+                "url": video_url
+            }
+        }
+        
+        # Add a divider after the video for better visual separation
+        divider = {
+            "object": "block",
+            "type": "divider",
+            "divider": {}
+        }
+        
+        # Combine embed, divider, and summary blocks
+        all_blocks = [youtube_embed, divider] + summary_blocks
         
         # Create the page properties
         properties = {
@@ -64,11 +87,11 @@ def add_youtube_entry(notion, database_id, title, summary, video_url, channel, c
             }
         }
         
-        # Create the page with summary blocks as content
+        # Create the page with YouTube embed and summary blocks as content
         page = notion.pages.create(
             parent={"database_id": database_id},
             properties=properties,
-            children=summary_blocks,
+            children=all_blocks,
             cover={"type": "external", "external": {"url": cover_url}} if cover_url else None
         )
         
