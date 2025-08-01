@@ -4,7 +4,7 @@ Tests for Notion database operations.
 
 import unittest
 from unittest.mock import Mock, patch
-from notion_db.operations import add_youtube_entry
+from youtube_notion.notion_db.operations import add_youtube_entry
 
 
 class TestNotionOperations(unittest.TestCase):

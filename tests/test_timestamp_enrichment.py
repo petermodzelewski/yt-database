@@ -4,7 +4,7 @@ Tests the conversion of timestamps to YouTube links.
 """
 
 import unittest
-from utils.markdown_converter import (
+from youtube_notion.utils.markdown_converter import (
     parse_timestamp_to_seconds,
     get_youtube_video_id,
     create_youtube_timestamp_url,

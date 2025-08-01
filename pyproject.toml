@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
-youtube-notion = "main:main"
+youtube-notion = "youtube_notion.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -43,7 +43,5 @@ addopts = [
     "--strict-markers"
 ]
 pythonpath = [
-    ".",
-    "src",
-    "config"
+    "src"
 ]

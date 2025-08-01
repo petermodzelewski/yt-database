@@ -4,7 +4,7 @@ Tests the conversion of markdown text to Notion rich text blocks.
 """
 
 import unittest
-from utils.markdown_converter import parse_rich_text, markdown_to_notion_blocks
+from youtube_notion.utils.markdown_converter import parse_rich_text, markdown_to_notion_blocks
 
 
 class TestParseRichText(unittest.TestCase):

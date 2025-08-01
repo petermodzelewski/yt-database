@@ -2,8 +2,8 @@
 Integration test to verify the markdown converter works with EXAMPLE_DATA.
 """
 
-from utils.markdown_converter import markdown_to_notion_blocks
-from example_data import EXAMPLE_DATA
+from youtube_notion.utils.markdown_converter import markdown_to_notion_blocks
+from youtube_notion.config.example_data import EXAMPLE_DATA
 
 
 def test_example_data_conversion():

@@ -2,7 +2,7 @@
 Notion database operations.
 """
 
-from utils.markdown_converter import markdown_to_notion_blocks, enrich_timestamps_with_links
+from ..utils.markdown_converter import markdown_to_notion_blocks, enrich_timestamps_with_links
 
 
 def find_database_by_name(notion, database_name, parent_page_name=None):

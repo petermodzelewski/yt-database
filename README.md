@@ -17,13 +17,24 @@ A Python application that automatically adds YouTube video summaries to a Notion
 
 ```
 youtube-notion-integration/
-├── src/                          # Source code
-│   ├── notion_db/               # Notion database operations
-│   └── utils/                   # Utility modules (markdown converter)
+├── src/
+│   └── youtube_notion/          # Main package
+│       ├── __init__.py
+│       ├── main.py              # Application entry point
+│       ├── config/              # Configuration and example data
+│       │   ├── __init__.py
+│       │   └── example_data.py
+│       ├── notion_db/           # Notion database operations
+│       │   ├── __init__.py
+│       │   └── operations.py
+│       └── utils/               # Utility modules
+│           ├── __init__.py
+│           └── markdown_converter.py
 ├── tests/                       # Comprehensive test suite
-├── config/                      # Configuration and example data
-├── main.py                      # Main application entry point
-└── requirements.txt             # Dependencies
+├── youtube_notion_cli.py        # Command-line entry point
+├── pyproject.toml              # Modern Python packaging
+├── setup.py                    # Package setup
+└── requirements.txt            # Dependencies
 ```
 
 ## Prerequisites
@@ -65,7 +76,15 @@ The full summary content will be added as the page content with proper markdown 
 ### 4. Run the Application
 
 ```bash
-python main.py
+# Option 1: Use the CLI script
+python youtube_notion_cli.py
+
+# Option 2: Install as package and use entry point
+pip install -e .
+youtube-notion
+
+# Option 3: Run as module
+python -m youtube_notion.main
 ```
 
 ## Getting a Notion Integration Token
@@ -125,18 +144,28 @@ Run the comprehensive test suite:
 # Easy way - use the test runner (handles path setup automatically)
 python run_tests.py
 
-# Manual way with proper Python path setup:
-# Windows PowerShell:
-$env:PYTHONPATH="src;config"; python -m pytest tests/ -v
+# Manual way with pytest (recommended):
+python -m pytest tests/ -v
 
-# Unix/Linux/Mac:
-PYTHONPATH=src:config python -m pytest tests/ -v
+# Or install the package in development mode first:
+pip install -e .
+pytest tests/ -v
 ```
 
 The test runner will automatically:
-- Set up the correct Python path
+- Set up the correct Python path for the package structure
 - Try to use pytest if available
 - Fall back to running tests individually if pytest isn't installed
+
+**Note**: The project now uses a proper Python package structure, eliminating the need for manual path manipulation that was required in the previous version.
+
+### Benefits of the New Structure
+
+- **Clean imports**: No more `sys.path` manipulation needed
+- **Standard packaging**: Follows modern Python best practices
+- **IDE-friendly**: Better autocomplete and code navigation
+- **Installable**: Can be installed as a proper Python package
+- **Maintainable**: Clear separation of concerns and modules
 
 ## Smart Timestamp Features
 
@@ -166,18 +195,32 @@ Becomes:
 
 ## Development
 
-### Project Structure
+### Package Structure
 
-- `src/notion_db/operations.py` - Database operations (find, create entries)
-- `src/utils/markdown_converter.py` - Markdown to Notion conversion
+- `src/youtube_notion/main.py` - Application entry point
+- `src/youtube_notion/notion_db/operations.py` - Database operations (find, create entries)
+- `src/youtube_notion/utils/markdown_converter.py` - Markdown to Notion conversion
+- `src/youtube_notion/config/example_data.py` - Sample data for testing
 - `tests/` - Unit and integration tests
-- `config/example_data.py` - Sample data for testing
+- `youtube_notion_cli.py` - Command-line interface script
 
 ### Adding New Features
 
-1. Add functionality to appropriate module in `src/`
-2. Write tests in `tests/`
+1. Add functionality to appropriate module in `src/youtube_notion/`
+2. Write tests in `tests/` (imports use `from youtube_notion.module import ...`)
 3. Update documentation
+
+### Installation for Development
+
+```bash
+# Install in development mode (recommended)
+pip install -e .
+
+# This allows you to:
+# - Import the package from anywhere: `from youtube_notion import ...`
+# - Use the CLI command: `youtube-notion`
+# - Make changes without reinstalling
+```
 
 ### Markdown Conversion Features
 
@@ -207,8 +250,9 @@ The markdown converter supports:
 - Property names are case-sensitive
 
 **Import errors**
-- Ensure you're running from the project root directory
-- Check that all dependencies are installed
+- Install the package in development mode: `pip install -e .`
+- Or ensure you're running from the project root with proper Python path
+- Check that all dependencies are installed: `pip install -r requirements.txt`
 
 ### Debug Mode
 

@@ -4,7 +4,7 @@ Tests the complete flow from timestamp enrichment to Notion blocks.
 """
 
 import unittest
-from utils.markdown_converter import enrich_timestamps_with_links, markdown_to_notion_blocks
+from youtube_notion.utils.markdown_converter import enrich_timestamps_with_links, markdown_to_notion_blocks
 
 
 class TestEndToEndTimestamps(unittest.TestCase):

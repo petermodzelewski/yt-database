@@ -36,7 +36,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "youtube-notion=main:main",
+            "youtube-notion=youtube_notion.main:main",
         ],
     },
 )

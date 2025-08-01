@@ -5,16 +5,11 @@ Adds YouTube video summaries to Notion database using EXAMPLE_DATA.
 """
 
 import os
-import sys
 from dotenv import load_dotenv
 from notion_client import Client
 
-# Add src and config to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'config'))
-
-from notion_db.operations import find_database_by_name, add_youtube_entry
-from example_data import EXAMPLE_DATA
+from .notion_db.operations import find_database_by_name, add_youtube_entry
+from .config.example_data import EXAMPLE_DATA
 
 # Load environment variables from .env file
 load_dotenv()

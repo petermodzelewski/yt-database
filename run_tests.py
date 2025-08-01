@@ -7,15 +7,14 @@ import sys
 import os
 import subprocess
 
-# Add src and config to Python path
+# Add src to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
 src_path = os.path.join(project_root, 'src')
-config_path = os.path.join(project_root, 'config')
 
 # Set PYTHONPATH environment variable
 env = os.environ.copy()
 current_path = env.get('PYTHONPATH', '')
-new_paths = [src_path, config_path]
+new_paths = [src_path]
 if current_path:
     new_paths.append(current_path)
 env['PYTHONPATH'] = os.pathsep.join(new_paths)
