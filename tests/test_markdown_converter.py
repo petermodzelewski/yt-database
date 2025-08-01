@@ -104,6 +104,42 @@ class TestMarkdownToNotionBlocks(unittest.TestCase):
         }]
         self.assertEqual(result, expected)
     
+    def test_heading_4(self):
+        """Test parsing H4 heading (should become H3 in Notion)."""
+        result = markdown_to_notion_blocks("#### Subsection Title")
+        expected = [{
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {
+                "rich_text": [{"type": "text", "text": {"content": "Subsection Title"}}]
+            }
+        }]
+        self.assertEqual(result, expected)
+    
+    def test_heading_5(self):
+        """Test parsing H5 heading (should become H3 in Notion)."""
+        result = markdown_to_notion_blocks("##### Deep Subsection")
+        expected = [{
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {
+                "rich_text": [{"type": "text", "text": {"content": "Deep Subsection"}}]
+            }
+        }]
+        self.assertEqual(result, expected)
+    
+    def test_heading_6(self):
+        """Test parsing H6 heading (should become H3 in Notion)."""
+        result = markdown_to_notion_blocks("###### Deepest Level")
+        expected = [{
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {
+                "rich_text": [{"type": "text", "text": {"content": "Deepest Level"}}]
+            }
+        }]
+        self.assertEqual(result, expected)
+    
     def test_paragraph(self):
         """Test parsing regular paragraph."""
         result = markdown_to_notion_blocks("This is a paragraph")
@@ -230,6 +266,40 @@ This is a paragraph."""
         self.assertEqual(result[0]["numbered_list_item"]["rich_text"][0]["text"]["content"], "First item")
         self.assertEqual(result[1]["numbered_list_item"]["rich_text"][0]["text"]["content"], "Second item")
         self.assertEqual(result[2]["numbered_list_item"]["rich_text"][0]["text"]["content"], "Tenth item")
+    
+    def test_all_header_levels(self):
+        """Test parsing all header levels in one document."""
+        markdown = """# Main Title
+## Section
+### Subsection
+#### Deep Section
+##### Deeper Section
+###### Deepest Section"""
+        
+        result = markdown_to_notion_blocks(markdown)
+        
+        # Should have 6 blocks
+        self.assertEqual(len(result), 6)
+        
+        # Check header types
+        self.assertEqual(result[0]["type"], "heading_1")
+        self.assertEqual(result[0]["heading_1"]["rich_text"][0]["text"]["content"], "Main Title")
+        
+        self.assertEqual(result[1]["type"], "heading_2")
+        self.assertEqual(result[1]["heading_2"]["rich_text"][0]["text"]["content"], "Section")
+        
+        self.assertEqual(result[2]["type"], "heading_3")
+        self.assertEqual(result[2]["heading_3"]["rich_text"][0]["text"]["content"], "Subsection")
+        
+        # H4, H5, H6 should all become H3
+        self.assertEqual(result[3]["type"], "heading_3")
+        self.assertEqual(result[3]["heading_3"]["rich_text"][0]["text"]["content"], "Deep Section")
+        
+        self.assertEqual(result[4]["type"], "heading_3")
+        self.assertEqual(result[4]["heading_3"]["rich_text"][0]["text"]["content"], "Deeper Section")
+        
+        self.assertEqual(result[5]["type"], "heading_3")
+        self.assertEqual(result[5]["heading_3"]["rich_text"][0]["text"]["content"], "Deepest Section")
 
 
 if __name__ == '__main__':

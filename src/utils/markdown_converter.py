@@ -54,31 +54,43 @@ def markdown_to_notion_blocks(markdown_text):
             i += 1
             continue
             
-        # Handle headers
-        if line.startswith('###'):
-            blocks.append({
-                "object": "block",
-                "type": "heading_3",
-                "heading_3": {
-                    "rich_text": [{"type": "text", "text": {"content": line[3:].strip()}}]
-                }
-            })
-        elif line.startswith('##'):
-            blocks.append({
-                "object": "block",
-                "type": "heading_2", 
-                "heading_2": {
-                    "rich_text": [{"type": "text", "text": {"content": line[2:].strip()}}]
-                }
-            })
-        elif line.startswith('#'):
-            blocks.append({
-                "object": "block",
-                "type": "heading_1",
-                "heading_1": {
-                    "rich_text": [{"type": "text", "text": {"content": line[1:].strip()}}]
-                }
-            })
+        # Handle headers (Notion supports only H1, H2, H3)
+        if line.startswith('#'):
+            # Count the number of # symbols
+            header_level = 0
+            for char in line:
+                if char == '#':
+                    header_level += 1
+                else:
+                    break
+            
+            header_text = line[header_level:].strip()
+            
+            if header_level == 1:
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_1",
+                    "heading_1": {
+                        "rich_text": [{"type": "text", "text": {"content": header_text}}]
+                    }
+                })
+            elif header_level == 2:
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_2", 
+                    "heading_2": {
+                        "rich_text": [{"type": "text", "text": {"content": header_text}}]
+                    }
+                })
+            elif header_level >= 3:
+                # H3 and beyond all become H3 in Notion
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_3",
+                    "heading_3": {
+                        "rich_text": [{"type": "text", "text": {"content": header_text}}]
+                    }
+                })
         # Handle bullet points
         elif line.startswith('*   ') or line.startswith('- '):
             bullet_text = line[4:] if line.startswith('*   ') else line[2:]

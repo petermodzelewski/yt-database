@@ -145,7 +145,10 @@ The test runner will automatically:
 
 The markdown converter supports:
 
-- **Headers**: `#`, `##`, `###` → Notion heading blocks
+- **Headers**: `#`, `##`, `###`, `####`, `#####`, `######` → Notion heading blocks
+  - H1 (`#`) → Notion Heading 1
+  - H2 (`##`) → Notion Heading 2  
+  - H3+ (`###`, `####`, etc.) → Notion Heading 3 (Notion only supports 3 levels)
 - **Lists**: `- item` and `1. item` → Notion list blocks
 - **Formatting**: `**bold**` and `*italic*` → Notion rich text
 - **Paragraphs**: Regular text → Notion paragraph blocks
