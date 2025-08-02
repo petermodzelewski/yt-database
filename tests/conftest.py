@@ -7,6 +7,21 @@ import os
 import pytest
 from unittest.mock import Mock
 
+# Load environment variables from .env file for integration tests
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not available, skip loading
+    pass
+
+# Register custom pytest markers
+def pytest_configure(config):
+    """Configure pytest with custom markers."""
+    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests requiring API keys")
+    config.addinivalue_line("markers", "unit: marks tests as unit tests")
+
 # Add src to Python path for package imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(project_root, 'src'))
