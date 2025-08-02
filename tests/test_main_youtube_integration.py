@@ -15,7 +15,7 @@ sys.path.insert(0, 'src')
 
 from youtube_notion.main import (
     main, 
-    validate_environment_variables, 
+    load_application_config, 
     initialize_notion_client,
     find_notion_database,
     process_youtube_video,
@@ -27,50 +27,46 @@ class TestEnvironmentValidation:
     """Test environment variable validation functionality."""
     
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test_token'}, clear=True)
-    def test_validate_environment_variables_example_mode(self):
-        """Test environment validation for example data mode."""
-        env_vars = validate_environment_variables(youtube_mode=False)
-        assert env_vars == {'NOTION_TOKEN': 'test_token'}
+    def test_load_application_config_example_mode(self):
+        """Test configuration loading for example data mode."""
+        config = load_application_config(youtube_mode=False)
+        assert config is not None
+        assert config.notion.notion_token == 'test_token'
     
     @patch.dict(os.environ, {
         'NOTION_TOKEN': 'test_token',
         'GEMINI_API_KEY': 'test_gemini_key',
         'YOUTUBE_API_KEY': 'test_youtube_key'
     }, clear=True)
-    def test_validate_environment_variables_youtube_mode_complete(self):
-        """Test environment validation for YouTube mode with all keys."""
-        env_vars = validate_environment_variables(youtube_mode=True)
-        expected = {
-            'NOTION_TOKEN': 'test_token',
-            'GEMINI_API_KEY': 'test_gemini_key',
-            'YOUTUBE_API_KEY': 'test_youtube_key'
-        }
-        assert env_vars == expected
+    def test_load_application_config_youtube_mode_complete(self):
+        """Test configuration loading for YouTube mode with all keys."""
+        config = load_application_config(youtube_mode=True)
+        assert config is not None
+        assert config.notion.notion_token == 'test_token'
+        assert config.youtube_processor is not None
     
     @patch.dict(os.environ, {
         'NOTION_TOKEN': 'test_token',
         'GEMINI_API_KEY': 'test_gemini_key'
     }, clear=True)
-    def test_validate_environment_variables_youtube_mode_minimal(self):
-        """Test environment validation for YouTube mode with minimal keys."""
-        env_vars = validate_environment_variables(youtube_mode=True)
-        expected = {
-            'NOTION_TOKEN': 'test_token',
-            'GEMINI_API_KEY': 'test_gemini_key'
-        }
-        assert env_vars == expected
+    def test_load_application_config_youtube_mode_minimal(self):
+        """Test configuration loading for YouTube mode with minimal keys."""
+        config = load_application_config(youtube_mode=True)
+        assert config is not None
+        assert config.notion.notion_token == 'test_token'
+        assert config.youtube_processor is not None
     
     @patch.dict(os.environ, {}, clear=True)
-    def test_validate_environment_variables_missing_notion_token(self):
-        """Test environment validation with missing NOTION_TOKEN."""
-        with pytest.raises(SystemExit):
-            validate_environment_variables(youtube_mode=False)
+    def test_load_application_config_missing_notion_token(self):
+        """Test configuration loading with missing NOTION_TOKEN."""
+        config = load_application_config(youtube_mode=False)
+        assert config is None
     
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test_token'}, clear=True)
-    def test_validate_environment_variables_missing_gemini_key(self):
-        """Test environment validation with missing GEMINI_API_KEY in YouTube mode."""
-        with pytest.raises(SystemExit):
-            validate_environment_variables(youtube_mode=True)
+    def test_load_application_config_missing_gemini_key(self):
+        """Test configuration loading with missing GEMINI_API_KEY in YouTube mode."""
+        config = load_application_config(youtube_mode=True)
+        assert config is None
 
 
 class TestNotionClientInitialization:

@@ -15,7 +15,7 @@ class TestURLValidation:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
     
     def test_validate_youtube_url_valid_urls(self):
         """Test validation of valid YouTube URLs."""
@@ -59,7 +59,7 @@ class TestVideoIDExtraction:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
         self.test_video_id = "dQw4w9WgXcQ"
     
     def test_extract_video_id_standard_urls(self):
@@ -153,7 +153,7 @@ class TestVideoIDExtractionErrors:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
     
     def test_extract_video_id_invalid_input_types(self):
         """Test extraction with invalid input types."""
@@ -221,7 +221,7 @@ class TestVideoIDValidation:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
     
     def test_is_valid_video_id_valid_ids(self):
         """Test validation of valid video IDs."""
@@ -282,7 +282,7 @@ class TestIntegrationScenarios:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
     
     def test_real_youtube_urls(self):
         """Test with real YouTube URLs and their expected video IDs."""

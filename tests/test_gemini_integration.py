@@ -22,10 +22,7 @@ class TestGeminiIntegration:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(
-            gemini_api_key="test_gemini_key",
-            youtube_api_key="test_youtube_key"
-        )
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", youtube_api_key="test_youtube_key")
         self.test_video_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         self.test_prompt = "Summarize this video with timestamps."
     
@@ -254,10 +251,7 @@ class TestRetryLogic:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(
-            gemini_api_key="test_gemini_key",
-            max_retries=3
-        )
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", max_retries=3)
     
     @patch('youtube_notion.processors.youtube_processor.time.sleep')
     def test_api_call_with_retry_success_after_failure(self, mock_sleep):
@@ -355,7 +349,7 @@ class TestProcessorConfiguration:
     
     def test_processor_initialization_with_defaults(self):
         """Test processor initialization with default configuration."""
-        processor = YouTubeProcessor(gemini_api_key="test_key")
+        processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
         
         assert processor.gemini_api_key == "test_key"
         assert processor.youtube_api_key is None
@@ -367,7 +361,7 @@ class TestProcessorConfiguration:
         """Test processor initialization with custom configuration."""
         custom_prompt = "Custom prompt for testing"
         
-        processor = YouTubeProcessor(
+        processor = YouTubeProcessor.from_api_keys(
             gemini_api_key="test_key",
             youtube_api_key="youtube_key",
             default_prompt=custom_prompt,
@@ -384,12 +378,12 @@ class TestProcessorConfiguration:
     def test_processor_initialization_missing_gemini_key(self):
         """Test that missing Gemini API key raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
-            YouTubeProcessor(gemini_api_key="")
+            YouTubeProcessor.from_api_keys(gemini_api_key="")
         
         assert "Gemini API key is required" in str(exc_info.value)
         
         with pytest.raises(ValueError) as exc_info:
-            YouTubeProcessor(gemini_api_key=None)
+            YouTubeProcessor.from_api_keys(gemini_api_key=None)
         
         assert "Gemini API key is required" in str(exc_info.value)
 
@@ -400,7 +394,7 @@ class TestGenerateContentConfig:
     @patch('youtube_notion.processors.youtube_processor.genai.Client')
     def test_generate_content_config_parameters(self, mock_client_class):
         """Test that correct configuration is passed to Gemini API."""
-        processor = YouTubeProcessor(gemini_api_key="test_key")
+        processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
         
         mock_client = Mock()
         mock_client_class.return_value = mock_client

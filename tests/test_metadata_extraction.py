@@ -24,11 +24,8 @@ class TestMetadataExtraction:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor_with_api = YouTubeProcessor(
-            gemini_api_key="test_gemini_key",
-            youtube_api_key="test_youtube_key"
-        )
-        self.processor_without_api = YouTubeProcessor(
+        self.processor_with_api = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", youtube_api_key="test_youtube_key")
+        self.processor_without_api = YouTubeProcessor.from_api_keys(
             gemini_api_key="test_gemini_key"
         )
         self.test_video_id = "dQw4w9WgXcQ"
@@ -46,10 +43,7 @@ class TestYouTubeDataAPI:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(
-            gemini_api_key="test_gemini_key",
-            youtube_api_key="test_youtube_key"
-        )
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", youtube_api_key="test_youtube_key")
         self.test_video_id = "dQw4w9WgXcQ"
     
     @patch('youtube_notion.processors.youtube_processor.build')
@@ -192,7 +186,7 @@ class TestWebScraping:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_gemini_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
         self.test_video_id = "dQw4w9WgXcQ"
     
     @patch('youtube_notion.processors.youtube_processor.requests.get')
@@ -278,7 +272,7 @@ class TestThumbnailConstruction:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor(gemini_api_key="test_gemini_key")
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
     
     def test_construct_thumbnail_url(self):
         """Test thumbnail URL construction."""
@@ -309,11 +303,8 @@ class TestMetadataExtractionIntegration:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor_with_api = YouTubeProcessor(
-            gemini_api_key="test_gemini_key",
-            youtube_api_key="test_youtube_key"
-        )
-        self.processor_without_api = YouTubeProcessor(
+        self.processor_with_api = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", youtube_api_key="test_youtube_key")
+        self.processor_without_api = YouTubeProcessor.from_api_keys(
             gemini_api_key="test_gemini_key"
         )
         self.test_video_id = "dQw4w9WgXcQ"

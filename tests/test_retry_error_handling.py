@@ -28,7 +28,7 @@ class TestRetryLogicEnhancements:
     @pytest.fixture
     def processor(self):
         """Create a YouTubeProcessor instance for testing."""
-        return YouTubeProcessor(
+        return YouTubeProcessor.from_api_keys(
             gemini_api_key="test_gemini_key",
             youtube_api_key="test_youtube_key",
             max_retries=3,
@@ -173,10 +173,7 @@ class TestYouTubeAPIErrorHandling:
     @pytest.fixture
     def processor(self):
         """Create a YouTubeProcessor instance for testing."""
-        return YouTubeProcessor(
-            gemini_api_key="test_gemini_key",
-            youtube_api_key="test_youtube_key"
-        )
+        return YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", youtube_api_key="test_youtube_key")
     
     def test_youtube_api_quota_exceeded_error(self, processor):
         """Test handling of YouTube API quota exceeded errors."""
@@ -282,7 +279,7 @@ class TestWebScrapingErrorHandling:
     @pytest.fixture
     def processor(self):
         """Create a YouTubeProcessor instance without YouTube API key."""
-        return YouTubeProcessor(gemini_api_key="test_gemini_key")
+        return YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
     
     @patch('src.youtube_notion.processors.youtube_processor.requests.get')
     def test_web_scraping_timeout_error(self, mock_get, processor):
@@ -351,7 +348,7 @@ class TestGeminiAPIErrorHandling:
     @pytest.fixture
     def processor(self):
         """Create a YouTubeProcessor instance for testing."""
-        return YouTubeProcessor(gemini_api_key="test_gemini_key")
+        return YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
     
     def test_gemini_quota_exceeded_error(self, processor):
         """Test handling of Gemini API quota exceeded errors."""
@@ -463,7 +460,7 @@ class TestErrorMessageEnhancements:
     @pytest.fixture
     def processor(self):
         """Create a YouTubeProcessor instance for testing."""
-        return YouTubeProcessor(gemini_api_key="test_gemini_key")
+        return YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
     
     def test_error_suggestions_for_api_key_errors(self, processor):
         """Test that API key errors get helpful suggestions."""
@@ -535,7 +532,7 @@ class TestErrorHandlingEdgeCases:
     @pytest.fixture
     def processor(self):
         """Create a YouTubeProcessor instance for testing."""
-        return YouTubeProcessor(gemini_api_key="test_gemini_key", max_retries=3)
+        return YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key", max_retries=3)
     
     @patch('src.youtube_notion.processors.youtube_processor.time.sleep')
     def test_mixed_error_types_during_retry(self, mock_sleep, processor):
