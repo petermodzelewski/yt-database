@@ -1,60 +1,74 @@
 # Technology Stack
 
-## Core Dependencies
+## Core Technologies
 
-- **Python 3.12+**: Minimum supported version
-- **notion-client**: Official Notion Python SDK for database operations
-- **python-dotenv**: Environment variable management
-- **pytest**: Testing framework
+- **Python 3.12+**: Primary language with modern packaging structure
+- **Notion SDK**: Official Python client for Notion API integration
+- **Google Gemini AI**: AI-powered video summary generation
+- **YouTube Data API**: Optional metadata extraction (falls back to web scraping)
+
+## Key Dependencies
+
+```
+notion-client          # Notion API integration
+python-dotenv          # Environment variable management
+pytest                 # Testing framework
+google-genai>=0.1.0    # Google Gemini AI integration
+google-api-python-client>=2.0.0  # YouTube Data API
+requests>=2.25.0       # HTTP requests for web scraping fallback
+```
 
 ## Build System
 
-- **Modern Python packaging**: Uses `pyproject.toml` with setuptools backend
-- **Development installation**: `pip install -e .` for editable installs
-- **Entry points**: Console script `youtube-notion` defined in pyproject.toml
+- **Modern Python Packaging**: Uses `pyproject.toml` with setuptools backend
+- **Development Installation**: `pip install -e .` for editable installs
+- **Entry Points**: Console script `youtube-notion` available after installation
 
 ## Common Commands
 
 ### Development Setup
 ```bash
-# Install dependencies
+# Clone and install dependencies
 pip install -r requirements.txt
 
 # Install in development mode (recommended)
 pip install -e .
 
-# Set up environment
+# Copy environment template
 cp .env.example .env
-# Edit .env to add NOTION_TOKEN
-```
-
-### Running the Application
-```bash
-# Option 1: Use CLI script
-python youtube_notion_cli.py
-
-# Option 2: Use installed entry point
-youtube-notion
-
-# Option 3: Run as module
-python -m youtube_notion.main
 ```
 
 ### Testing
 ```bash
-# Recommended: Use test runner (handles path setup)
+# Preferred method - uses test runner with proper path setup
 python run_tests.py
 
-# Alternative: Direct pytest
+# Direct pytest (requires proper PYTHONPATH)
 python -m pytest tests/ -v
 
-# After development install
+# Install package first, then test
+pip install -e .
 pytest tests/ -v
 ```
 
-## Architecture Patterns
+### Running the Application
+```bash
+# CLI script (recommended for development)
+python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"
 
-- **Package structure**: Modern src-layout with `src/youtube_notion/`
-- **Modular design**: Separate modules for database operations, markdown conversion, and utilities
-- **Configuration**: Environment-based config with .env files
-- **Error handling**: Graceful error handling with user-friendly messages
+# Installed console command
+youtube-notion --url "https://youtu.be/VIDEO_ID"
+
+# Module execution
+python -m youtube_notion.main
+
+# Example data mode (default)
+python youtube_notion_cli.py --example-data
+```
+
+## Configuration Management
+
+- **Environment Variables**: Uses `.env` files with python-dotenv
+- **Configuration Classes**: Structured config validation in `config/` module
+- **API Key Management**: Supports multiple API providers with graceful fallbacks
+- **Mode Detection**: Automatic configuration validation based on operation mode

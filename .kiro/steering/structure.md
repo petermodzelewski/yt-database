@@ -1,61 +1,80 @@
 # Project Structure
 
-## Directory Layout
+## Package Organization
+
+The project follows modern Python packaging standards with a clear separation of concerns:
 
 ```
 youtube-notion-integration/
-├── src/
-│   └── youtube_notion/          # Main package
+├── src/youtube_notion/          # Main package (importable)
+│   ├── __init__.py
+│   ├── main.py                  # Application entry point
+│   ├── config/                  # Configuration and example data
+│   │   ├── __init__.py
+│   │   └── example_data.py
+│   ├── notion_db/               # Notion database operations
+│   │   ├── __init__.py
+│   │   └── operations.py
+│   ├── processors/              # Video processing logic
+│   │   └── youtube_processor.py
+│   └── utils/                   # Utility modules
 │       ├── __init__.py
-│       ├── main.py              # Application entry point
-│       ├── config/              # Configuration and example data
-│       │   ├── __init__.py
-│       │   └── example_data.py
-│       ├── notion_db/           # Notion database operations
-│       │   ├── __init__.py
-│       │   └── operations.py
-│       └── utils/               # Utility modules
-│           ├── __init__.py
-│           └── markdown_converter.py
+│       └── markdown_converter.py
 ├── tests/                       # Comprehensive test suite
-├── youtube_notion_cli.py        # Command-line entry point
+├── youtube_notion_cli.py        # CLI entry point script
+├── run_tests.py                 # Test runner with path setup
 ├── pyproject.toml              # Modern Python packaging
 ├── setup.py                    # Package setup
 └── requirements.txt            # Dependencies
 ```
 
-## Module Organization
+## Key Architectural Patterns
 
-### Core Application (`src/youtube_notion/`)
-- **main.py**: Entry point, orchestrates the workflow using example data
-- **config/example_data.py**: Sample YouTube video data for testing/demo
+### Module Responsibilities
 
-### Database Layer (`notion_db/`)
-- **operations.py**: Notion API interactions
-  - `find_database_by_name()`: Locate target database
-  - `add_youtube_entry()`: Create formatted Notion pages
+- **`main.py`**: Application orchestration, error handling, and user feedback
+- **`config/`**: Environment configuration, validation, and example data
+- **`notion_db/operations.py`**: Database discovery and entry creation
+- **`processors/`**: YouTube video processing and AI integration
+- **`utils/markdown_converter.py`**: Markdown to Notion rich text conversion
 
-### Utilities (`utils/`)
-- **markdown_converter.py**: Markdown to Notion conversion
-  - `markdown_to_notion_blocks()`: Convert markdown to Notion blocks
-  - `enrich_timestamps_with_links()`: Transform timestamps to clickable links
-  - `parse_rich_text()`: Handle markdown formatting (bold, italic, links)
+### Import Patterns
 
-### Testing (`tests/`)
-- **Unit tests**: Individual component testing
-- **Integration tests**: End-to-end workflow testing
-- **conftest.py**: Pytest configuration and path setup
-- **run_tests.py**: Custom test runner with fallback support
+```python
+# Internal imports use relative imports within package
+from .notion_db.operations import find_database_by_name
+from .config.example_data import EXAMPLE_DATA
+from .utils.markdown_converter import parse_rich_text
 
-## Import Conventions
+# External imports for processors (optional dependencies)
+from .processors.youtube_processor import YouTubeProcessor
+```
 
-- Use relative imports within the package: `from .utils.markdown_converter import ...`
-- Package imports in tests: `from youtube_notion.module import ...`
-- External dependencies imported at module level
+### Error Handling Strategy
 
-## File Naming
+- **Configuration Errors**: Graceful validation with user-friendly messages
+- **API Errors**: Specific exception types with retry logic and fallbacks
+- **Processing Errors**: Detailed error context with troubleshooting guidance
+- **Return Values**: Boolean success indicators for main functions
 
-- Snake_case for Python files and modules
-- Test files prefixed with `test_`
-- Configuration files use standard names (`.env`, `pyproject.toml`)
-- CLI entry point uses descriptive name (`youtube_notion_cli.py`)
+### Testing Structure
+
+- **Unit Tests**: Individual module functionality (`test_*.py`)
+- **Integration Tests**: API interactions with mocking
+- **End-to-End Tests**: Full workflow testing
+- **Test Configuration**: `conftest.py` with fixtures and path setup
+- **Test Runner**: `run_tests.py` handles PYTHONPATH automatically
+
+### Configuration Management
+
+- **Environment Files**: `.env` with `.env.example` template
+- **Mode-Based Validation**: Different requirements for YouTube vs example mode
+- **Graceful Fallbacks**: YouTube API → web scraping, detailed error messages
+- **Structured Config**: Configuration classes with validation
+
+### CLI Design
+
+- **Dual Entry Points**: `youtube_notion_cli.py` (development) and console script (installed)
+- **Mutually Exclusive Modes**: `--url` vs `--example-data`
+- **Argument Validation**: Clear error messages for invalid combinations
+- **Help Documentation**: Comprehensive usage examples
