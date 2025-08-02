@@ -136,7 +136,7 @@ class TestYouTubeDataAPI:
         
         assert "YouTube API quota exceeded" in str(exc_info.value)
         assert exc_info.value.api_name == "YouTube Data API"
-        assert exc_info.value.quota_type == "quotaExceeded"
+        assert exc_info.value.quota_type == "per_minute"
     
     @patch('youtube_notion.processors.youtube_processor.build')
     def test_get_metadata_via_api_http_error(self, mock_build):

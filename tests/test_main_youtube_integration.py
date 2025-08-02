@@ -57,14 +57,18 @@ class TestEnvironmentValidation:
         assert config.youtube_processor is not None
     
     @patch.dict(os.environ, {}, clear=True)
-    def test_load_application_config_missing_notion_token(self):
+    @patch('youtube_notion.config.settings.load_dotenv')
+    def test_load_application_config_missing_notion_token(self, mock_load_dotenv):
         """Test configuration loading with missing NOTION_TOKEN."""
+        mock_load_dotenv.return_value = None  # Prevent loading from .env file
         config = load_application_config(youtube_mode=False)
         assert config is None
     
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test_token'}, clear=True)
-    def test_load_application_config_missing_gemini_key(self):
+    @patch('youtube_notion.config.settings.load_dotenv')
+    def test_load_application_config_missing_gemini_key(self, mock_load_dotenv):
         """Test configuration loading with missing GEMINI_API_KEY in YouTube mode."""
+        mock_load_dotenv.return_value = None  # Prevent loading from .env file
         config = load_application_config(youtube_mode=True)
         assert config is None
 
@@ -99,9 +103,12 @@ class TestNotionClientInitialization:
     def test_find_notion_database_success(self, mock_find_db):
         """Test successful database finding."""
         mock_notion = MagicMock()
+        mock_config = MagicMock()
+        mock_config.notion.database_name = "YT Summaries"
+        mock_config.notion.parent_page_name = "YouTube Knowledge Base"
         mock_find_db.return_value = "test_db_id"
         
-        result = find_notion_database(mock_notion)
+        result = find_notion_database(mock_notion, mock_config)
         
         assert result == "test_db_id"
         mock_find_db.assert_called_once_with(mock_notion, "YT Summaries", "YouTube Knowledge Base")
@@ -110,9 +117,12 @@ class TestNotionClientInitialization:
     def test_find_notion_database_not_found(self, mock_find_db):
         """Test database not found scenario."""
         mock_notion = MagicMock()
+        mock_config = MagicMock()
+        mock_config.notion.database_name = "YT Summaries"
+        mock_config.notion.parent_page_name = "YouTube Knowledge Base"
         mock_find_db.return_value = None
         
-        result = find_notion_database(mock_notion)
+        result = find_notion_database(mock_notion, mock_config)
         
         assert result is None
     
@@ -120,9 +130,12 @@ class TestNotionClientInitialization:
     def test_find_notion_database_exception(self, mock_find_db):
         """Test database finding with exception."""
         mock_notion = MagicMock()
+        mock_config = MagicMock()
+        mock_config.notion.database_name = "YT Summaries"
+        mock_config.notion.parent_page_name = "YouTube Knowledge Base"
         mock_find_db.side_effect = Exception("Database access error")
         
-        result = find_notion_database(mock_notion)
+        result = find_notion_database(mock_notion, mock_config)
         
         assert result is None
 
@@ -144,20 +157,20 @@ class TestYouTubeVideoProcessing:
             "Summary": "Test summary"
         }
         
-        env_vars = {
-            'GEMINI_API_KEY': 'test_gemini_key',
-            'YOUTUBE_API_KEY': 'test_youtube_key'
-        }
+        mock_config = MagicMock()
+        mock_config.youtube_processor = MagicMock()
+        mock_config.youtube_processor.gemini_api_key = 'test_gemini_key'
+        mock_config.youtube_processor.youtube_api_key = 'test_youtube_key'
         
         result = process_youtube_video(
             "https://www.youtube.com/watch?v=test123",
             "Custom prompt",
-            env_vars
+            mock_config
         )
         
         assert result is not None
         assert result["Title"] == "Test Video"
-        mock_processor_class.assert_called_once_with('test_gemini_key', 'test_youtube_key')
+        mock_processor_class.assert_called_once_with(mock_config.youtube_processor)
         mock_processor.validate_youtube_url.assert_called_once()
         mock_processor.process_video.assert_called_once_with(
             "https://www.youtube.com/watch?v=test123",
@@ -333,8 +346,11 @@ class TestMainIntegrationWorkflow:
         # Verify success
         assert result is True
         
-        # Verify processor calls
-        mock_processor_class.assert_called_once_with('test_gemini_key', 'test_youtube_key')
+        # Verify processor calls - expect config object, not individual parameters
+        assert mock_processor_class.call_count == 1
+        call_args = mock_processor_class.call_args[0][0]  # Get the config object
+        assert call_args.gemini_api_key == 'test_gemini_key'
+        assert call_args.youtube_api_key == 'test_youtube_key'
         mock_processor.validate_youtube_url.assert_called_once_with(test_url)
         mock_processor.process_video.assert_called_once_with(test_url, test_prompt)
         
@@ -352,10 +368,12 @@ class TestMainIntegrationWorkflow:
         )
     
     @patch.dict(os.environ, {}, clear=True)
-    def test_main_missing_environment_variables(self):
+    @patch('youtube_notion.config.settings.load_dotenv')
+    def test_main_missing_environment_variables(self, mock_load_dotenv):
         """Test main function with missing environment variables."""
-        with pytest.raises(SystemExit):
-            main()
+        mock_load_dotenv.return_value = None  # Prevent loading from .env file
+        result = main()
+        assert result is False  # Should return False, not raise SystemExit
     
     @patch('youtube_notion.main.Client')
     @patch.dict(os.environ, {'NOTION_TOKEN': 'invalid_token'}, clear=True)

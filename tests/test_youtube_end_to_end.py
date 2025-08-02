@@ -922,7 +922,6 @@ class TestYouTubeEndToEndPerformance:
             pytest.skip("YouTube API key not available")
         
         import psutil
-        import os
         
         process = psutil.Process(os.getpid())
         
@@ -1406,12 +1405,20 @@ class TestYouTubeEndToEndErrorScenarios:
         
         video_data = TEST_VIDEOS["short"]
         
-        # Mock empty Gemini response
+        # Mock empty Gemini response - try multiple methods since the implementation might vary
         with patch.object(processor, '_call_gemini_api', return_value=""):
-            with pytest.raises(APIError) as exc_info:
-                processor.process_video(video_data["url"])
-            
-            assert "empty response" in str(exc_info.value).lower()
+            try:
+                result = processor.process_video(video_data["url"])
+                # If no exception is raised, the test should fail unless rate limited
+                pytest.fail("Expected APIError for empty response, but got result: " + str(result))
+            except APIError as e:
+                assert "empty response" in str(e).lower()
+            except Exception as e:
+                # Handle potential rate limiting or other Gemini API issues
+                if "rate limit" in str(e).lower() or "quota" in str(e).lower():
+                    pytest.skip(f"Gemini API rate limited: {e}")
+                else:
+                    raise
     
     def test_unicode_handling(self, processor):
         """Test handling of Unicode characters in video metadata."""
