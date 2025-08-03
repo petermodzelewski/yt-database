@@ -95,6 +95,13 @@ class TestVideoIDExtraction:
             ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=youtu.be", "dQw4w9WgXcQ"),
             ("https://youtu.be/dQw4w9WgXcQ?t=123", "dQw4w9WgXcQ"),
             ("https://youtu.be/dQw4w9WgXcQ?si=abc123", "dQw4w9WgXcQ"),
+            # Test the specific parameters mentioned by the user
+            ("https://www.youtube.com/watch?v=1LKruiR_4hA&pp=ugUEEgJlbg%3D%3D", "1LKruiR_4hA"),
+            ("https://www.youtube.com/watch?v=Ri_o1TpHYsw&t=5s", "Ri_o1TpHYsw"),
+            ("https://youtu.be/1LKruiR_4hA?pp=ugUEEgJlbg%3D%3D", "1LKruiR_4hA"),
+            ("https://youtu.be/Ri_o1TpHYsw?t=5s", "Ri_o1TpHYsw"),
+            # Test multiple parameters
+            ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=5s&pp=ugUEEgJlbg%3D%3D&feature=youtu.be", "dQw4w9WgXcQ"),
         ]
         
         for url, expected_id in test_cases:
