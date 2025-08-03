@@ -72,7 +72,7 @@ Final thoughts and wrap-up."""
             # Verify all pipeline steps were called
             mock_extract.assert_called_once_with(test_url)
             mock_metadata.assert_called_once_with('test_video_id')
-            mock_summary.assert_called_once_with(test_url, None)
+            mock_summary.assert_called_once_with(test_url, None, mock_youtube_metadata)
             
             # Verify result structure matches EXAMPLE_DATA format
             assert isinstance(result, dict)
@@ -97,7 +97,7 @@ Final thoughts and wrap-up."""
             result = processor.process_video(test_url, custom_prompt=custom_prompt)
             
             # Verify custom prompt was passed to summary generation
-            mock_summary.assert_called_once_with(test_url, custom_prompt)
+            mock_summary.assert_called_once_with(test_url, custom_prompt, mock_youtube_metadata)
             
             # Verify result is still properly formatted
             assert result["Summary"] == mock_gemini_summary

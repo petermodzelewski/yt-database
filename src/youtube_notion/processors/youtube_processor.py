@@ -16,6 +16,7 @@ from googleapiclient.errors import HttpError
 import google.genai as genai
 from google.genai import types
 from ..config.settings import YouTubeProcessorConfig, DEFAULT_SUMMARY_PROMPT
+from ..utils.chat_logger import ChatLogger
 from .exceptions import (
     YouTubeProcessingError,
     InvalidURLError,
@@ -60,6 +61,9 @@ class YouTubeProcessor:
         self.default_prompt = config.default_prompt
         self.max_retries = config.max_retries
         self.timeout_seconds = config.timeout_seconds
+        
+        # Initialize chat logger
+        self.chat_logger = ChatLogger()
     
     @classmethod
     def from_api_keys(cls, gemini_api_key: str, youtube_api_key: Optional[str] = None, 
@@ -142,7 +146,7 @@ class YouTubeProcessor:
             metadata = self._get_video_metadata(video_id)
             
             # Step 3: Generate AI summary using Gemini
-            summary = self._generate_summary(youtube_url, custom_prompt)
+            summary = self._generate_summary(youtube_url, custom_prompt, metadata)
             
             # Step 4: Construct response data structure matching EXAMPLE_DATA format
             result = {
@@ -525,7 +529,8 @@ class YouTubeProcessor:
                 details=f"Video ID: {video_id}"
             )
     
-    def _generate_summary(self, video_url: str, prompt: Optional[str] = None) -> str:
+    def _generate_summary(self, video_url: str, prompt: Optional[str] = None, 
+                         video_metadata: Optional[Dict[str, str]] = None) -> str:
         """
         Generate AI summary using Google Gemini.
         
@@ -536,6 +541,7 @@ class YouTubeProcessor:
         Args:
             video_url: YouTube URL for Gemini to process
             prompt: Prompt for summary generation (uses default if None)
+            video_metadata: Optional video metadata for logging
             
         Returns:
             str: AI-generated markdown summary with timestamps
@@ -547,7 +553,24 @@ class YouTubeProcessor:
         if prompt is None:
             prompt = self.default_prompt
         
-        return self._api_call_with_retry(self._call_gemini_api, video_url, prompt)
+        # Generate summary with retry logic
+        response = self._api_call_with_retry(self._call_gemini_api, video_url, prompt)
+        
+        # Log the chat conversation
+        try:
+            video_id = self._extract_video_id(video_url)
+            self.chat_logger.log_chat(
+                video_id=video_id,
+                video_url=video_url,
+                prompt=prompt,
+                response=response,
+                video_metadata=video_metadata
+            )
+        except Exception as e:
+            # Don't fail the main process if logging fails
+            print(f"Warning: Failed to log chat conversation: {e}")
+        
+        return response
     
     def _call_gemini_api(self, video_url: str, prompt: str) -> str:
         """
