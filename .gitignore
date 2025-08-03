@@ -40,3 +40,6 @@ Thumbs.db
 
 # Chat logs
 chat_logs/
+
+# Batch file
+batch.txt

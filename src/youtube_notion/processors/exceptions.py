@@ -121,7 +121,9 @@ class QuotaExceededError(APIError):
     - Daily or monthly usage limits are reached
     """
     
-    def __init__(self, message: str, api_name: str = None, quota_type: str = None, reset_time: str = None):
+    def __init__(self, message: str, api_name: str = None, quota_type: str = None, 
+                 reset_time: str = None, retry_delay_seconds: int = None, 
+                 raw_error: dict = None):
         """
         Initialize with quota-specific information.
         
@@ -130,10 +132,14 @@ class QuotaExceededError(APIError):
             api_name: Name of the API that hit quota limits
             quota_type: Type of quota exceeded (e.g., 'daily', 'per_minute')
             reset_time: When the quota will reset (if known)
+            retry_delay_seconds: Seconds to wait before retrying (from API response)
+            raw_error: Raw error response from API for detailed analysis
         """
         super().__init__(message, api_name=api_name)
         self.quota_type = quota_type
         self.reset_time = reset_time
+        self.retry_delay_seconds = retry_delay_seconds
+        self.raw_error = raw_error
     
     def __str__(self):
         parts = [self.message]
@@ -141,6 +147,8 @@ class QuotaExceededError(APIError):
             parts.append(f"API: {self.api_name}")
         if self.quota_type:
             parts.append(f"Quota Type: {self.quota_type}")
+        if self.retry_delay_seconds:
+            parts.append(f"Retry After: {self.retry_delay_seconds}s")
         if self.reset_time:
             parts.append(f"Resets: {self.reset_time}")
         if self.details:

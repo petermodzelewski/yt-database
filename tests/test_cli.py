@@ -80,7 +80,7 @@ class TestCLIValidation:
                 with pytest.raises(SystemExit) as exc_info:
                     youtube_notion_cli.main_cli()
                 assert exc_info.value.code == 1
-                assert "Error: --prompt can only be used with --url" in mock_stderr.getvalue()
+                assert "Error: --prompt can only be used with single --url" in mock_stderr.getvalue()
     
     def test_prompt_with_example_data_error(self):
         """Test that --prompt with --example-data raises an error."""
@@ -89,7 +89,7 @@ class TestCLIValidation:
                 with pytest.raises(SystemExit) as exc_info:
                     youtube_notion_cli.main_cli()
                 assert exc_info.value.code == 1
-                assert "Error: --prompt can only be used with --url" in mock_stderr.getvalue()
+                assert "Error: --prompt can only be used with single --url" in mock_stderr.getvalue()
 
 
 class TestCLIExecution:
