@@ -1,74 +1,81 @@
-# Technology Stack
+---
+inclusion: always
+---
 
-## Core Technologies
+# Technical Guidelines
 
-- **Python 3.12+**: Primary language with modern packaging structure
-- **Notion SDK**: Official Python client for Notion API integration
-- **Google Gemini AI**: AI-powered video summary generation
-- **YouTube Data API**: Optional metadata extraction (falls back to web scraping)
+## Technology Stack & Dependencies
 
-## Key Dependencies
+**Core Stack**: Python 3.12+, Notion SDK, Google Gemini AI, YouTube Data API
+**Key Dependencies**: `notion-client`, `google-genai>=0.1.0`, `python-dotenv`, `pytest`
 
+## Development Patterns
+
+### Package Structure
+- Use relative imports within `src/youtube_notion/` package
+- Follow modern Python packaging with `pyproject.toml`
+- Maintain clear module separation: `config/`, `notion_db/`, `processors/`, `utils/`
+
+### Testing Requirements
+- **Always use**: `python run_tests.py` (handles PYTHONPATH automatically)
+- **Avoid**: Direct `pytest` calls without proper path setup
+- Install in development mode: `pip install -e .` before testing
+
+### Test-Driven Development Standards
+- **MANDATORY**: Write proper unit tests for every functionality change
+- **NEVER**: Use print statements or quick checks for validation
+- **ALWAYS**: Run full test suite after any code changes
+- **REQUIRED**: Review and update existing tests when functionality changes
+- **PREFER**: Unit tests over integration tests (faster execution)
+- **STRUCTURE**: Follow existing test patterns in `tests/` directory
+- **COVERAGE**: Ensure new code paths are covered by tests
+- **VALIDATION**: Tests must pass before considering changes complete
+
+### Error Handling Standards
+- Return boolean success indicators from main functions
+- Use specific exception types with retry logic
+- Provide user-friendly error messages with troubleshooting context
+- Implement graceful fallbacks (YouTube API → web scraping)
+
+### Configuration Management
+- Use `.env` files with `python-dotenv` for environment variables
+- Validate configuration based on operation mode (YouTube vs example data)
+- Support multiple API providers with graceful degradation
+
+## Code Style Rules
+
+### Import Conventions
+```python
+# Internal package imports (relative)
+from .notion_db.operations import find_database_by_name
+from .config.example_data import EXAMPLE_DATA
+
+# External dependencies (absolute)
+from notion_client import Client
 ```
-notion-client          # Notion API integration
-python-dotenv          # Environment variable management
-pytest                 # Testing framework
-google-genai>=0.1.0    # Google Gemini AI integration
-google-api-python-client>=2.0.0  # YouTube Data API
-requests>=2.25.0       # HTTP requests for web scraping fallback
-```
 
-## Build System
+### CLI Design Patterns
+- Support dual entry points: `youtube_notion_cli.py` (dev) and console script (installed)
+- Use mutually exclusive argument groups for different modes
+- Provide comprehensive help documentation with examples
 
-- **Modern Python Packaging**: Uses `pyproject.toml` with setuptools backend
-- **Development Installation**: `pip install -e .` for editable installs
-- **Entry Points**: Console script `youtube-notion` available after installation
+### API Integration Standards
+- Implement retry logic for external API calls
+- Use structured error handling with specific exception types
+- Support fallback mechanisms (API → web scraping)
+- Validate API responses before processing
 
-## Common Commands
+## Development Commands
 
-### Development Setup
 ```bash
-# Clone and install dependencies
-pip install -r requirements.txt
-
-# Install in development mode (recommended)
+# Setup (required)
 pip install -e .
-
-# Copy environment template
 cp .env.example .env
-```
 
-### Testing
-```bash
-# Preferred method - uses test runner with proper path setup
+# Testing (preferred method)
 python run_tests.py
 
-# Direct pytest (requires proper PYTHONPATH)
-python -m pytest tests/ -v
-
-# Install package first, then test
-pip install -e .
-pytest tests/ -v
+# Running application
+python youtube_notion_cli.py --example-data  # Default mode
+python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # YouTube mode
 ```
-
-### Running the Application
-```bash
-# CLI script (recommended for development)
-python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"
-
-# Installed console command
-youtube-notion --url "https://youtu.be/VIDEO_ID"
-
-# Module execution
-python -m youtube_notion.main
-
-# Example data mode (default)
-python youtube_notion_cli.py --example-data
-```
-
-## Configuration Management
-
-- **Environment Variables**: Uses `.env` files with python-dotenv
-- **Configuration Classes**: Structured config validation in `config/` module
-- **API Key Management**: Supports multiple API providers with graceful fallbacks
-- **Mode Detection**: Automatic configuration validation based on operation mode
