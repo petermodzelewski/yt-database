@@ -149,11 +149,17 @@ The application supports two main modes of operation:
 Process any YouTube video with AI-generated summaries:
 
 ```bash
-# Basic usage - process a YouTube video
+# Basic usage - process a single YouTube video
 python youtube_notion_cli.py --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
-# Use a custom prompt for AI summary generation
+# Use a custom prompt for AI summary generation (single URL only)
 python youtube_notion_cli.py --url "https://youtu.be/dQw4w9WgXcQ" --prompt "Focus on the key technical concepts and provide detailed timestamps"
+
+# Process multiple URLs with comma-separated list
+python youtube_notion_cli.py --urls "https://youtu.be/dQw4w9WgXcQ,https://youtu.be/oHg5SJYRHA0,https://youtu.be/kJQP7kiw5Fk"
+
+# Process URLs from a file (one URL per line, empty lines ignored)
+python youtube_notion_cli.py --file urls.txt
 
 # Example with different URL formats (all supported):
 python youtube_notion_cli.py --url "https://www.youtube.com/watch?v=VIDEO_ID"
@@ -178,9 +184,11 @@ python youtube_notion_cli.py --example-data
 
 | Option | Description | Example |
 |--------|-------------|---------|
-| `--url URL` | Process a specific YouTube video URL | `--url "https://youtu.be/abc123"` |
+| `--url URL` | Process a single YouTube video URL | `--url "https://youtu.be/abc123"` |
+| `--urls URLS` | Process multiple URLs (comma-separated) | `--urls "https://youtu.be/abc123,https://youtu.be/def456"` |
+| `--file FILE` | Process URLs from file (one per line) | `--file urls.txt` |
 | `--example-data` | Use built-in example data (default) | `--example-data` |
-| `--prompt TEXT` | Custom AI prompt (only with --url) | `--prompt "Summarize key points"` |
+| `--prompt TEXT` | Custom AI prompt (only with single --url) | `--prompt "Summarize key points"` |
 | `--help` | Show help message and exit | `--help` |
 
 #### Alternative Execution Methods
@@ -406,6 +414,121 @@ Use timestamps in the format [MM:SS] or [MM:SS-MM:SS] for time ranges.
 
 You can override this by setting `DEFAULT_SUMMARY_PROMPT` in your `.env` file.
 
+## Multi-URL Processing
+
+The application supports processing multiple YouTube URLs in a single command, making it easy to batch process educational content, meeting recordings, or entire playlists.
+
+### Input Methods
+
+#### 1. Comma-Separated URLs
+```bash
+# Process multiple URLs at once
+python youtube_notion_cli.py --urls "https://youtu.be/dQw4w9WgXcQ,https://youtu.be/oHg5SJYRHA0,https://youtu.be/kJQP7kiw5Fk"
+
+# URLs can have spaces around commas (automatically trimmed)
+python youtube_notion_cli.py --urls "https://youtu.be/abc123, https://youtu.be/def456 , https://youtu.be/ghi789"
+
+# Empty entries are automatically ignored
+python youtube_notion_cli.py --urls "https://youtu.be/abc123,,https://youtu.be/def456"
+```
+
+#### 2. File Input
+Create a text file with one URL per line:
+
+```bash
+# Create urls.txt
+cat > urls.txt << EOF
+https://youtu.be/dQw4w9WgXcQ
+
+https://youtu.be/oHg5SJYRHA0
+https://youtu.be/kJQP7kiw5Fk
+EOF
+
+# Process all URLs from file
+python youtube_notion_cli.py --file urls.txt
+```
+
+**File format features:**
+- One URL per line
+- Empty lines are automatically ignored
+- Leading/trailing whitespace is trimmed
+- Supports any text file encoding (UTF-8 recommended)
+
+### Batch Processing Features
+
+#### Progress Tracking
+```
+Processing 3 YouTube URLs...
+============================================================
+
+[1/3] Processing: https://youtu.be/dQw4w9WgXcQ
+----------------------------------------
+✓ Processed: Rick Astley - Never Gonna Give You Up
+✓ Added to Notion: Rick Astley - Never Gonna Give You Up
+
+[2/3] Processing: https://youtu.be/oHg5SJYRHA0
+----------------------------------------
+✓ Processed: RickRoll'D
+✓ Added to Notion: RickRoll'D
+
+[3/3] Processing: https://youtu.be/kJQP7kiw5Fk
+----------------------------------------
+✓ Processed: Luis Fonsi - Despacito ft. Daddy Yankee
+✓ Added to Notion: Luis Fonsi - Despacito ft. Daddy Yankee
+```
+
+#### Error Handling & Summary
+```
+============================================================
+BATCH PROCESSING SUMMARY
+============================================================
+Total URLs processed: 5
+Successful: 3
+Failed: 2
+
+Failed URLs:
+  - https://invalid-url.com
+  - https://youtu.be/nonexistent123
+```
+
+#### Key Benefits
+- **Resilient**: Continues processing even if individual URLs fail
+- **Informative**: Shows progress and detailed error messages
+- **Efficient**: Optimized output for batch operations (less verbose per item)
+- **Complete**: Provides comprehensive summary at the end
+
+### Limitations
+
+- **Custom prompts**: Only supported with single `--url` (not with `--urls` or `--file`)
+- **Rate limits**: Respects API rate limits automatically with built-in retry logic
+- **Memory usage**: Processes URLs sequentially to manage memory efficiently
+
+### Use Cases
+
+#### Educational Content Curation
+```bash
+# Process an entire course or tutorial series
+python youtube_notion_cli.py --file course_videos.txt
+```
+
+#### Meeting/Conference Processing
+```bash
+# Process multiple recorded sessions
+python youtube_notion_cli.py --urls "https://youtu.be/session1,https://youtu.be/session2,https://youtu.be/session3"
+```
+
+#### Research & Documentation
+```bash
+# Process research videos for a project
+cat > research_videos.txt << EOF
+https://youtu.be/paper1_presentation
+https://youtu.be/paper2_discussion
+https://youtu.be/expert_interview
+EOF
+
+python youtube_notion_cli.py --file research_videos.txt
+```
+
 ## Usage Patterns & Examples
 
 ### Common Workflows
@@ -445,13 +568,31 @@ python youtube_notion_cli.py \
   --prompt "Create a step-by-step guide with clear instructions. Include timestamps for each step and highlight any prerequisites or important warnings."
 ```
 
-#### 3. Batch Processing (Manual)
+#### 3. Batch Processing
+
+**Multiple URLs at once:**
 ```bash
-# Process multiple videos (run separately)
+# Comma-separated URLs
+python youtube_notion_cli.py --urls "https://youtu.be/video1,https://youtu.be/video2,https://youtu.be/video3"
+
+# From a file (create urls.txt with one URL per line)
+echo "https://youtu.be/video1" > urls.txt
+echo "https://youtu.be/video2" >> urls.txt
+echo "https://youtu.be/video3" >> urls.txt
+python youtube_notion_cli.py --file urls.txt
+
+# Manual processing (run separately)
 python youtube_notion_cli.py --url "https://youtu.be/video1"
 python youtube_notion_cli.py --url "https://youtu.be/video2"
 python youtube_notion_cli.py --url "https://youtu.be/video3"
 ```
+
+**Batch processing features:**
+- Progress tracking with `[1/3]` indicators
+- Comprehensive error handling per URL
+- Summary report showing successful vs failed URLs
+- Continues processing even if individual URLs fail
+- Optimized output for batch operations (less verbose)
 
 #### 4. Development and Testing
 ```bash
@@ -701,16 +842,43 @@ python -c "import os; print('NOTION_TOKEN' in os.environ)"
 
 **Invalid Argument Combinations**
 ```bash
-# ❌ Cannot use --prompt without --url
+# ❌ Cannot use --prompt without single --url
 python youtube_notion_cli.py --prompt "Custom prompt" --example-data
+python youtube_notion_cli.py --prompt "Custom prompt" --urls "url1,url2"
+python youtube_notion_cli.py --prompt "Custom prompt" --file urls.txt
 
-# ❌ Cannot use both --url and --example-data
+# ❌ Cannot combine multiple input methods
 python youtube_notion_cli.py --url "https://youtu.be/abc" --example-data
+python youtube_notion_cli.py --urls "url1,url2" --file urls.txt
+python youtube_notion_cli.py --url "https://youtu.be/abc" --urls "url1,url2"
 
 # ✅ Valid combinations
 python youtube_notion_cli.py --url "https://youtu.be/abc" --prompt "Custom prompt"
+python youtube_notion_cli.py --urls "https://youtu.be/abc,https://youtu.be/def"
+python youtube_notion_cli.py --file urls.txt
 python youtube_notion_cli.py --example-data
 python youtube_notion_cli.py  # Defaults to example data
+```
+
+**File Input Validation**
+```bash
+# ❌ File not found
+python youtube_notion_cli.py --file nonexistent.txt
+# Error: File 'nonexistent.txt' not found
+
+# ❌ Empty file or no valid URLs
+python youtube_notion_cli.py --file empty.txt
+# Error: No URLs found in file
+
+# ✅ Valid file with mixed content (empty lines ignored)
+cat > mixed_urls.txt << EOF
+https://youtu.be/abc123
+
+https://youtu.be/def456
+   
+https://youtu.be/ghi789
+EOF
+python youtube_notion_cli.py --file mixed_urls.txt
 ```
 
 ### Debug Mode

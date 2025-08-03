@@ -85,7 +85,7 @@ def find_notion_database(notion: Client, config: ApplicationConfig) -> Optional[
         return None
 
 
-def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig) -> Optional[Dict[str, Any]]:
+def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig, batch_mode: bool = False) -> Optional[Dict[str, Any]]:
     """
     Process a YouTube video using the YouTubeProcessor.
     
@@ -130,14 +130,18 @@ def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config
             return None
         
         # Process the video
-        print(f"Processing YouTube video: {youtube_url}")
-        if custom_prompt:
-            print("Using custom prompt for AI summary generation")
+        if not batch_mode:
+            print(f"Processing YouTube video: {youtube_url}")
+            if custom_prompt:
+                print("Using custom prompt for AI summary generation")
         
         video_data = processor.process_video(youtube_url, custom_prompt)
         
-        print(f"✓ Successfully processed video: {video_data['Title']}")
-        print(f"✓ Channel: {video_data['Channel']}")
+        if not batch_mode:
+            print(f"✓ Successfully processed video: {video_data['Title']}")
+            print(f"✓ Channel: {video_data['Channel']}")
+        else:
+            print(f"✓ Processed: {video_data['Title']}")
         
         return video_data
         
@@ -219,7 +223,7 @@ def add_to_notion_database(notion: Client, database_id: str, video_data: Dict[st
         return False
 
 
-def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None) -> bool:
+def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None, batch_mode: bool = False) -> bool:
     """
     Main function to add YouTube summary to Notion database.
     
@@ -228,6 +232,7 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None)
     Args:
         youtube_url: YouTube URL to process. If None, uses EXAMPLE_DATA.
         custom_prompt: Custom prompt for AI summary generation.
+        batch_mode: If True, reduces verbose output for batch processing.
         
     Returns:
         bool: True if successful, False otherwise
@@ -235,50 +240,59 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None)
     # Determine operation mode
     youtube_mode = youtube_url is not None
     
-    print("=" * 60)
-    print("YouTube to Notion Database Integration")
-    print("=" * 60)
-    
-    if youtube_mode:
-        print(f"Mode: YouTube URL Processing")
-        print(f"URL: {youtube_url}")
-    else:
-        print("Mode: Example Data")
-    
-    print()
+    if not batch_mode:
+        print("=" * 60)
+        print("YouTube to Notion Database Integration")
+        print("=" * 60)
+        
+        if youtube_mode:
+            print(f"Mode: YouTube URL Processing")
+            print(f"URL: {youtube_url}")
+        else:
+            print("Mode: Example Data")
+        
+        print()
     
     # Step 1: Load and validate configuration
-    print("1. Loading configuration...")
+    if not batch_mode:
+        print("1. Loading configuration...")
     config = load_application_config(youtube_mode)
     if not config:
         return False
-    print("✓ Configuration loaded and validated")
+    if not batch_mode:
+        print("✓ Configuration loaded and validated")
     
     # Step 2: Initialize Notion client
-    print("\n2. Initializing Notion client...")
+    if not batch_mode:
+        print("\n2. Initializing Notion client...")
     notion = initialize_notion_client(config.notion.notion_token)
     if not notion:
         return False
-    print("✓ Notion client initialized")
+    if not batch_mode:
+        print("✓ Notion client initialized")
     
     # Step 3: Find target database
-    print("\n3. Finding target database...")
+    if not batch_mode:
+        print("\n3. Finding target database...")
     database_id = find_notion_database(notion, config)
     if not database_id:
         return False
-    print("✓ Found 'YT Summaries' database")
+    if not batch_mode:
+        print("✓ Found 'YT Summaries' database")
     
     # Step 4: Process video data
-    print("\n4. Processing video data...")
+    if not batch_mode:
+        print("\n4. Processing video data...")
     
     if youtube_mode:
         # YouTube URL processing mode
-        video_data = process_youtube_video(youtube_url, custom_prompt, config)
+        video_data = process_youtube_video(youtube_url, custom_prompt, config, batch_mode)
         if not video_data:
             return False
     else:
         # Example data mode
-        print("Using example data from config")
+        if not batch_mode:
+            print("Using example data from config")
         video_data = {
             "Title": EXAMPLE_DATA["Title"],
             "Video URL": EXAMPLE_DATA["Video URL"],
@@ -286,21 +300,29 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None)
             "Cover": EXAMPLE_DATA["Cover"],
             "Summary": EXAMPLE_DATA["Summary"]
         }
-        print(f"✓ Loaded example data: {video_data['Title']}")
+        if not batch_mode:
+            print(f"✓ Loaded example data: {video_data['Title']}")
     
     # Step 5: Add to Notion database
-    print("\n5. Adding entry to Notion database...")
+    if not batch_mode:
+        print("\n5. Adding entry to Notion database...")
     success = add_to_notion_database(notion, database_id, video_data)
     
     if success:
-        print("\n" + "=" * 60)
-        print("SUCCESS: YouTube summary added to Notion database!")
-        print("=" * 60)
+        if not batch_mode:
+            print("\n" + "=" * 60)
+            print("SUCCESS: YouTube summary added to Notion database!")
+            print("=" * 60)
+        else:
+            print(f"✓ Added to Notion: {video_data['Title']}")
         return True
     else:
-        print("\n" + "=" * 60)
-        print("FAILED: Could not add YouTube summary to Notion database")
-        print("=" * 60)
+        if not batch_mode:
+            print("\n" + "=" * 60)
+            print("FAILED: Could not add YouTube summary to Notion database")
+            print("=" * 60)
+        else:
+            print(f"✗ Failed to add: {video_data.get('Title', 'Unknown')}")
         return False
 
 
