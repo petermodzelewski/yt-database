@@ -44,9 +44,11 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - **Progress Tracking**: Show progress indicators for batch operations (e.g., "Processing 3/10...")
 - **Error Resilience**: Continue processing remaining URLs even if some fail
 - **Batch Reporting**: Provide summary of successful/failed operations at completion
-- **Rate Limiting**: Implement appropriate delays between API calls to respect quotas
+- **Intelligent Quota Management**: Parse `retryDelay` from API responses and wait appropriately
+- **Smart Retry Logic**: Wait for API-specified delay + 15 second buffer before retrying
+- **Progress Feedback**: Show clear messages during quota waits (e.g., "Waiting 33 seconds before retry...")
+- **Test Mode Optimization**: Cap retry delays to 5 seconds during testing to prevent hangs
 - **Reduced Verbosity**: Use concise output in batch mode to avoid overwhelming logs
-- **Parallel Processing**: Consider concurrent processing for improved performance (with rate limits)
 - **Resume Capability**: Support resuming interrupted batch operations
 
 ### User Experience Principles
@@ -55,3 +57,6 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - **Helpful Errors**: Include specific troubleshooting steps in error messages
 - **Mode Clarity**: Make operation mode clear to users in CLI help and output
 - **Batch Efficiency**: Minimize redundant operations (database lookups, client initialization) in batch mode
+- **Quota Transparency**: Show clear messages when waiting for API quota limits (e.g., "Waiting 33 seconds...")
+- **Resilient Processing**: Continue batch operations even when individual URLs hit quota limits
+- **Test-Friendly**: Automatically detect test environments and cap delays to prevent hangs

@@ -13,6 +13,8 @@ A Python application that automatically processes YouTube videos and adds AI-gen
 - 🖼️ **Cover Images**: Automatically adds video thumbnails as page covers
 - 🔄 **Dual Mode Operation**: Supports both example data mode and live YouTube processing
 - 🛡️ **Robust Error Handling**: Comprehensive error handling with retry logic and graceful fallbacks
+- ⚡ **Intelligent Quota Management**: Automatically handles API quota limits with smart retry delays
+- 🔄 **Batch Processing**: Process multiple URLs with resilient error handling
 - 🧪 **Comprehensive Testing**: 50+ unit tests ensuring reliable functionality
 - 📁 **Professional Structure**: Organized, maintainable codebase following Python best practices
 
@@ -260,7 +262,14 @@ The Google Gemini API generates intelligent summaries of YouTube videos with tim
 **Pricing & Limits:**
 - **Free Tier**: 15 requests per minute, 1,500 requests per day
 - **Cost**: $0.00 for most personal use cases
-- **Rate Limits**: Automatically handled with retry logic
+- **Rate Limits**: Automatically handled with intelligent retry logic
+
+**Quota Handling:**
+- **Smart Retry**: Automatically parses `retryDelay` from API responses (e.g., "18s")
+- **Intelligent Waiting**: Waits for API-specified delay + 15 second buffer before retrying
+- **Batch Resilience**: Continues processing other URLs even when some hit quota limits
+- **Progress Feedback**: Shows exactly how long the system is waiting and why
+- **Test Mode**: Caps retry delays to 5 seconds during testing to prevent hangs
 
 ### YouTube Data API Key (Optional but Recommended)
 
@@ -528,6 +537,93 @@ EOF
 
 python youtube_notion_cli.py --file research_videos.txt
 ```
+
+## Intelligent Quota Management
+
+The system includes sophisticated quota handling that makes it highly resilient to API rate limits and quota exceeded errors.
+
+### How It Works
+
+When the Gemini API returns a quota exceeded error, it often includes a `retryDelay` field specifying exactly when you can retry:
+
+```json
+{
+  "error": {
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.RetryInfo",
+        "retryDelay": "18s"
+      }
+    ]
+  }
+}
+```
+
+The system automatically:
+1. **Parses the retry delay** from the API response (e.g., "18s")
+2. **Waits for the specified time + 15 second buffer** (e.g., 33 seconds total)
+3. **Retries the request** instead of failing immediately
+4. **Continues batch processing** for other URLs
+
+### Real-World Example
+
+```bash
+# Before: Immediate failure
+❌ Error: API quota exceeded - Gemini API quota exceeded: 429 RESOURCE_EXHAUSTED
+
+# After: Intelligent retry
+⏳ API quota exceeded. Waiting 33 seconds before retry (attempt 1/3)...
+✅ Successfully processed video: Your Video Title
+✅ Added to Notion: Your Video Title
+```
+
+### Batch Processing Resilience
+
+When processing multiple URLs, quota limits don't stop the entire batch:
+
+```bash
+python youtube_notion_cli.py --file large_batch.txt
+
+# Output:
+[1/10] Processing: https://youtu.be/video1
+✅ Added to Notion: Video 1 Title
+
+[2/10] Processing: https://youtu.be/video2
+⏳ API quota exceeded. Waiting 33 seconds before retry (attempt 1/3)...
+✅ Added to Notion: Video 2 Title
+
+[3/10] Processing: https://youtu.be/video3
+✅ Added to Notion: Video 3 Title
+# ... continues processing all URLs
+```
+
+### Test Mode Behavior
+
+During testing, retry delays are automatically capped to prevent long test hangs:
+
+```bash
+# Production: Wait full delay
+"API quota exceeded. Waiting 33 seconds before retry (attempt 1/3)..."
+
+# Test mode: Capped delay  
+"API quota exceeded. Test mode: waiting 5s (capped from 33s) before retry (attempt 1/3)..."
+```
+
+### Configuration
+
+The quota handling works automatically with these defaults:
+- **Buffer time**: 15 seconds added to API-specified delay
+- **Max retries**: 3 attempts per URL
+- **Test mode cap**: 5 seconds maximum delay during testing
+- **Fallback**: Uses exponential backoff if no retry delay specified
+
+### Benefits
+
+- **Higher success rate**: Respects API guidance instead of failing immediately
+- **Batch resilience**: Continues processing other URLs during quota delays
+- **Clear feedback**: Shows exactly what's happening and how long to wait
+- **Test-friendly**: Prevents test suite hangs while maintaining production behavior
+- **Production-ready**: Handles real-world quota scenarios gracefully
 
 ## Usage Patterns & Examples
 

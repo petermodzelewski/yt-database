@@ -36,6 +36,9 @@ inclusion: always
 - Use specific exception types with retry logic
 - Provide user-friendly error messages with troubleshooting context
 - Implement graceful fallbacks (YouTube API → web scraping)
+- **Intelligent Quota Management**: Parse `retryDelay` from API responses and wait appropriately
+- **Test Mode Detection**: Cap retry delays to 5 seconds during testing to prevent hangs
+- **Batch Resilience**: Continue processing other URLs even when some hit quota limits
 
 ### Configuration Management
 - Use `.env` files with `python-dotenv` for environment variables
@@ -69,7 +72,10 @@ from notion_client import Client
 - Validate API responses before processing
 - Implement rate limiting for batch operations to respect API quotas
 - Use connection pooling and session reuse for batch processing efficiency
-- Handle quota exceeded errors gracefully with exponential backoff
+- **Enhanced Quota Handling**: Parse `retryDelay` from API error responses (e.g., "18s")
+- **Smart Retry Logic**: Wait for API-specified delay + 15 second buffer before retrying
+- **Batch Processing Resilience**: Continue processing remaining URLs when individual ones hit quota limits
+- **Test Environment Optimization**: Cap retry delays to 5 seconds maximum during testing
 
 ## Development Commands
 
