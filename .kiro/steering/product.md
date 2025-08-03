@@ -39,8 +39,19 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - **Cleanup Management**: Automatic cleanup of logs older than 30 days
 - **Error Resilience**: Logging failures don't interrupt main processing workflow
 
+### Batch Processing Standards
+- **Multiple URLs**: Support processing multiple YouTube URLs in a single operation
+- **Progress Tracking**: Show progress indicators for batch operations (e.g., "Processing 3/10...")
+- **Error Resilience**: Continue processing remaining URLs even if some fail
+- **Batch Reporting**: Provide summary of successful/failed operations at completion
+- **Rate Limiting**: Implement appropriate delays between API calls to respect quotas
+- **Reduced Verbosity**: Use concise output in batch mode to avoid overwhelming logs
+- **Parallel Processing**: Consider concurrent processing for improved performance (with rate limits)
+- **Resume Capability**: Support resuming interrupted batch operations
+
 ### User Experience Principles
 - **Clear Feedback**: Provide progress indicators and success/failure messages
 - **Validation First**: Validate inputs (URLs, API keys) before processing
 - **Helpful Errors**: Include specific troubleshooting steps in error messages
 - **Mode Clarity**: Make operation mode clear to users in CLI help and output
+- **Batch Efficiency**: Minimize redundant operations (database lookups, client initialization) in batch mode

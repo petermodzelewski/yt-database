@@ -32,11 +32,12 @@ youtube-notion-integration/
 
 ### Module Responsibilities
 
-- **`main.py`**: Application orchestration, error handling, and user feedback
+- **`main.py`**: Application orchestration, error handling, user feedback, and batch processing coordination
 - **`config/`**: Environment configuration, validation, and example data
-- **`notion_db/operations.py`**: Database discovery and entry creation
-- **`processors/`**: YouTube video processing and AI integration
+- **`notion_db/operations.py`**: Database discovery and entry creation with batch optimization
+- **`processors/`**: YouTube video processing and AI integration with rate limiting
 - **`utils/markdown_converter.py`**: Markdown to Notion rich text conversion
+- **`utils/batch_processor.py`**: Batch processing utilities, progress tracking, and error aggregation
 
 ### Import Patterns
 
@@ -56,6 +57,8 @@ from .processors.youtube_processor import YouTubeProcessor
 - **API Errors**: Specific exception types with retry logic and fallbacks
 - **Processing Errors**: Detailed error context with troubleshooting guidance
 - **Return Values**: Boolean success indicators for main functions
+- **Batch Errors**: Aggregate error reporting with individual URL failure tracking
+- **Rate Limiting**: Exponential backoff and quota management for batch operations
 
 ### Testing Structure
 
@@ -75,6 +78,9 @@ from .processors.youtube_processor import YouTubeProcessor
 ### CLI Design
 
 - **Dual Entry Points**: `youtube_notion_cli.py` (development) and console script (installed)
-- **Mutually Exclusive Modes**: `--url` vs `--example-data`
+- **Mutually Exclusive Modes**: `--url` vs `--example-data` vs `--batch`
+- **Batch Input Methods**: Multiple URLs via `--urls` or file input via `--file`
 - **Argument Validation**: Clear error messages for invalid combinations
-- **Help Documentation**: Comprehensive usage examples
+- **Help Documentation**: Comprehensive usage examples including batch operations
+- **Progress Indicators**: Real-time progress feedback for batch processing
+- **Output Control**: Verbose vs concise output modes based on operation type

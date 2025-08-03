@@ -58,12 +58,18 @@ from notion_client import Client
 - Support dual entry points: `youtube_notion_cli.py` (dev) and console script (installed)
 - Use mutually exclusive argument groups for different modes
 - Provide comprehensive help documentation with examples
+- Support batch processing with `--batch` flag and multiple URL inputs
+- Implement file-based URL input for large batch operations
+- Use `batch_mode` parameter to control output verbosity
 
 ### API Integration Standards
 - Implement retry logic for external API calls
 - Use structured error handling with specific exception types
 - Support fallback mechanisms (API → web scraping)
 - Validate API responses before processing
+- Implement rate limiting for batch operations to respect API quotas
+- Use connection pooling and session reuse for batch processing efficiency
+- Handle quota exceeded errors gracefully with exponential backoff
 
 ## Development Commands
 
@@ -78,4 +84,6 @@ python run_tests.py
 # Running application
 python youtube_notion_cli.py --example-data  # Default mode
 python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # YouTube mode
+python youtube_notion_cli.py --batch --urls url1 url2 url3  # Batch mode
+python youtube_notion_cli.py --batch --file urls.txt  # Batch from file
 ```
