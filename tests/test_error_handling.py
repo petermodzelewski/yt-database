@@ -156,3 +156,75 @@ This has **special** chars: àáâãäåæçèéêë & symbols: @#$%^&*()
         # Should handle gracefully
         result = find_database_by_name(mock_notion, "DB Name", "Page Name")
         assert result is None
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_unicode_encoding_edge_cases(self, mock_get):
+        """Test handling of unicode encoding edge cases in web scraping."""
+        from youtube_notion.processors.youtube_processor import YouTubeProcessor
+        
+        processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        
+        # Test with completely malformed JSON
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Broken JSON \\u201","ownerChannelName":"Test"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        # Should handle gracefully and fall back to raw strings
+        result = processor._get_metadata_via_scraping("test123")
+        assert "Broken JSON" in result['title']
+        assert result['channel'] == "Test"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_unicode_encoding_empty_strings(self, mock_get):
+        """Test handling of empty strings in unicode encoding."""
+        from youtube_notion.processors.youtube_processor import YouTubeProcessor
+        
+        processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        
+        # Test with empty title and channel
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"","ownerChannelName":""
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        # Should handle empty strings gracefully by falling back to defaults
+        result = processor._get_metadata_via_scraping("test123")
+        assert result['title'] == "Unknown Title"  # Falls back to default when empty
+        assert result['channel'] == "Unknown Channel"  # Falls back to default when empty
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_unicode_encoding_null_values(self, mock_get):
+        """Test handling of null/None values in unicode encoding."""
+        from youtube_notion.processors.youtube_processor import YouTubeProcessor
+        
+        processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        
+        # Test with HTML that doesn't contain title/channel patterns
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        var someOtherData = {"unrelated": "data"};
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        # Should handle missing patterns gracefully
+        result = processor._get_metadata_via_scraping("test123")
+        assert result['title'] == "Unknown Title"
+        assert result['channel'] == "Unknown Channel"

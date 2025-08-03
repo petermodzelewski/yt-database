@@ -468,9 +468,16 @@ class YouTubeProcessor:
                     details="Video may be private, deleted, or restricted"
                 )
             
-            # Decode unicode escape sequences
-            title = title.encode().decode('unicode_escape')
-            channel = channel.encode().decode('unicode_escape')
+            # Properly decode JSON-escaped unicode sequences
+            import json
+            try:
+                # Use JSON decoder to properly handle unicode escapes while preserving UTF-8
+                title = json.loads(f'"{title}"')
+                channel = json.loads(f'"{channel}"')
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # If JSON decoding fails, use the raw strings
+                # This handles cases where the strings don't contain escape sequences
+                pass
             
             return {
                 'title': title,

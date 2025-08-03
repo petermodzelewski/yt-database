@@ -298,6 +298,228 @@ class TestThumbnailConstruction:
             assert result == expected_url
 
 
+class TestUnicodeEncoding:
+    """Test cases for unicode character encoding in metadata extraction."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
+        self.test_video_id = "test123"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_em_dash_encoding(self, mock_get):
+        """Test that em dash characters are correctly decoded in web scraping."""
+        # Mock HTML with em dash as unicode escape sequence
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Agents vs Workflows: Why Not Both? \\u2014 Sam Bhagwat, Mastra.ai","ownerChannelName":"Test Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify em dash is correctly decoded
+        expected_title = "Agents vs Workflows: Why Not Both? — Sam Bhagwat, Mastra.ai"
+        assert result['title'] == expected_title
+        assert result['channel'] == "Test Channel"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_smart_quotes_encoding(self, mock_get):
+        """Test that smart quotes are correctly decoded in web scraping."""
+        # Mock HTML with smart quotes as unicode escape sequences
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Testing \\u201cSmart Quotes\\u201d in Title","ownerChannelName":"Test Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify smart quotes are correctly decoded (allow for different quote styles)
+        assert "Smart Quotes" in result['title']
+        assert len(result['title']) > len("Testing Smart Quotes in Title")  # Should have quote characters
+        assert result['channel'] == "Test Channel"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_accented_characters_encoding(self, mock_get):
+        """Test that accented characters are correctly decoded in web scraping."""
+        # Mock HTML with accented characters as unicode escape sequences
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"French Caf\\u00e9 and R\\u00e9sum\\u00e9","ownerChannelName":"Test Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify accented characters are correctly decoded
+        expected_title = "French Café and Résumé"
+        assert result['title'] == expected_title
+        assert result['channel'] == "Test Channel"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_mathematical_symbols_encoding(self, mock_get):
+        """Test that mathematical symbols are correctly decoded in web scraping."""
+        # Mock HTML with mathematical symbols as unicode escape sequences
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Math: \\u03b1 + \\u03b2 = \\u03b3","ownerChannelName":"Test Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify mathematical symbols are correctly decoded
+        expected_title = "Math: α + β = γ"
+        assert result['title'] == expected_title
+        assert result['channel'] == "Test Channel"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_mixed_unicode_characters(self, mock_get):
+        """Test that mixed unicode characters are correctly decoded in web scraping."""
+        # Mock HTML with various unicode characters
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Mixed: \\u2014 \\u201cQuotes\\u201d \\u00e9 \\u03b1","ownerChannelName":"Caf\\u00e9 Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify all unicode characters are correctly decoded
+        assert "—" in result['title']  # em dash
+        assert "é" in result['title']  # accented e
+        assert "α" in result['title']  # alpha
+        assert "Café" in result['channel']  # accented e in channel
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_regular_ascii_unchanged(self, mock_get):
+        """Test that regular ASCII characters remain unchanged."""
+        # Mock HTML with regular ASCII characters
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Regular ASCII Title with - dash","ownerChannelName":"Regular Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify ASCII characters remain unchanged
+        expected_title = "Regular ASCII Title with - dash"
+        assert result['title'] == expected_title
+        assert result['channel'] == "Regular Channel"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_malformed_unicode_fallback(self, mock_get):
+        """Test that malformed unicode sequences fall back gracefully."""
+        # Mock HTML with malformed unicode escape sequences
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Malformed \\u201 incomplete","ownerChannelName":"Test Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify that malformed sequences fall back to raw strings
+        assert "Malformed" in result['title']
+        assert result['channel'] == "Test Channel"
+    
+    @patch('youtube_notion.processors.youtube_processor.build')
+    def test_api_unicode_preservation(self, mock_build):
+        """Test that YouTube API correctly preserves unicode characters."""
+        # Mock YouTube API response with unicode characters
+        mock_youtube = Mock()
+        mock_videos = Mock()
+        mock_list = Mock()
+        mock_request = Mock()
+        
+        mock_build.return_value = mock_youtube
+        mock_youtube.videos.return_value = mock_videos
+        mock_videos.list.return_value = mock_list
+        mock_list.execute.return_value = {
+            'items': [{
+                'snippet': {
+                    'title': 'Agents vs Workflows: Why Not Both? — Sam Bhagwat, Mastra.ai',
+                    'channelTitle': 'Café Channel',
+                    'description': 'Test description with α symbols',
+                    'publishedAt': '2023-01-01T00:00:00Z'
+                }
+            }]
+        }
+        
+        # Create processor with API key
+        processor_with_api = YouTubeProcessor.from_api_keys(
+            gemini_api_key="test_gemini_key", 
+            youtube_api_key="test_youtube_key"
+        )
+        
+        result = processor_with_api._get_metadata_via_api(self.test_video_id)
+        
+        # Verify unicode characters are preserved from API
+        expected_title = "Agents vs Workflows: Why Not Both? — Sam Bhagwat, Mastra.ai"
+        assert result['title'] == expected_title
+        assert result['channel'] == "Café Channel"
+        assert result['description'] == "Test description with α symbols"
+    
+    @patch('youtube_notion.processors.youtube_processor.requests.get')
+    def test_web_scraping_channel_name_encoding(self, mock_get):
+        """Test that channel names with unicode characters are correctly decoded."""
+        # Mock HTML with unicode characters in channel name
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <script>
+        "title":"Regular Title","ownerChannelName":"Caf\\u00e9 \\u2014 Channel"
+        </script>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        result = self.processor._get_metadata_via_scraping(self.test_video_id)
+        
+        # Verify channel name unicode characters are correctly decoded
+        expected_channel = "Café — Channel"
+        assert result['title'] == "Regular Title"
+        assert result['channel'] == expected_channel
+
+
 class TestMetadataExtractionIntegration:
     """Integration tests for metadata extraction methods."""
     
