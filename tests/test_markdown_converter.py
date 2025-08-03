@@ -126,6 +126,114 @@ class TestParseRichText(unittest.TestCase):
             {"type": "text", "text": {"content": " for details"}}
         ]
         self.assertEqual(result, expected)
+    
+    def test_link_inside_bold_text(self):
+        """Test parsing links inside bold text - the main fix for the reported issue."""
+        result = parse_rich_text("**Parenting Advice [01:16-01:49](https://www.youtube.com/watch?v=8fVHFt7Shf4&t=76s):** Alex uses Claude")
+        expected = [
+            {"type": "text", "text": {"content": "Parenting Advice "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "01:16-01:49", "link": {"url": "https://www.youtube.com/watch?v=8fVHFt7Shf4&t=76s"}}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": ":"}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": " Alex uses Claude"}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_link_inside_italic_text(self):
+        """Test parsing links inside italic text."""
+        result = parse_rich_text("*Check out [this link](https://example.com) for more info*")
+        expected = [
+            {"type": "text", "text": {"content": "Check out "}, "annotations": {"italic": True}},
+            {"type": "text", "text": {"content": "this link", "link": {"url": "https://example.com"}}, "annotations": {"italic": True}},
+            {"type": "text", "text": {"content": " for more info"}, "annotations": {"italic": True}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_multiple_links_inside_bold_text(self):
+        """Test parsing multiple links inside bold text."""
+        result = parse_rich_text("**Visit [Google](https://google.com) and [GitHub](https://github.com)**")
+        expected = [
+            {"type": "text", "text": {"content": "Visit "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "Google", "link": {"url": "https://google.com"}}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": " and "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "GitHub", "link": {"url": "https://github.com"}}, "annotations": {"bold": True}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_bold_text_with_link_and_regular_text(self):
+        """Test bold text containing a link followed by regular text."""
+        result = parse_rich_text("**Bold with [link](https://example.com)** and regular text")
+        expected = [
+            {"type": "text", "text": {"content": "Bold with "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "link", "link": {"url": "https://example.com"}}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": " and regular text"}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_complex_formatting_with_links(self):
+        """Test complex scenario with multiple formatting types and links."""
+        result = parse_rich_text("**Bold [link1](https://example1.com)** and *italic [link2](https://example2.com)* text")
+        expected = [
+            {"type": "text", "text": {"content": "Bold "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "link1", "link": {"url": "https://example1.com"}}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": " and "}},
+            {"type": "text", "text": {"content": "italic "}, "annotations": {"italic": True}},
+            {"type": "text", "text": {"content": "link2", "link": {"url": "https://example2.com"}}, "annotations": {"italic": True}},
+            {"type": "text", "text": {"content": " text"}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_youtube_timestamp_in_bold_bullet_point(self):
+        """Test the specific case from the bug report - YouTube timestamp in bold bullet point."""
+        # This simulates the markdown after timestamp enrichment
+        result = parse_rich_text("**Parenting Advice [01:16-01:49](https://www.youtube.com/watch?v=8fVHFt7Shf4&t=76s):** Alex uses Claude to get an objective perspective.")
+        expected = [
+            {"type": "text", "text": {"content": "Parenting Advice "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "01:16-01:49", "link": {"url": "https://www.youtube.com/watch?v=8fVHFt7Shf4&t=76s"}}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": ":"}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": " Alex uses Claude to get an objective perspective."}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_nested_formatting_edge_cases(self):
+        """Test edge cases with nested formatting."""
+        # Bold text with no links should still work
+        result = parse_rich_text("**Just bold text**")
+        expected = [
+            {"type": "text", "text": {"content": "Just bold text"}, "annotations": {"bold": True}}
+        ]
+        self.assertEqual(result, expected)
+        
+        # Italic text with no links should still work
+        result = parse_rich_text("*Just italic text*")
+        expected = [
+            {"type": "text", "text": {"content": "Just italic text"}, "annotations": {"italic": True}}
+        ]
+        self.assertEqual(result, expected)
+    
+    def test_malformed_links_in_formatted_text(self):
+        """Test that malformed links in formatted text don't break parsing."""
+        # Missing closing bracket - should be treated as regular text
+        result = parse_rich_text("**Bold with [incomplete link**")
+        expected = [
+            {"type": "text", "text": {"content": "Bold with [incomplete link"}, "annotations": {"bold": True}}
+        ]
+        self.assertEqual(result, expected)
+        
+        # Empty URL parentheses - regex requires at least one char, so treated as regular text
+        result = parse_rich_text("**Bold with [text]() empty URL**")
+        expected = [
+            {"type": "text", "text": {"content": "Bold with "}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "["}, "annotations": {"bold": True}},
+            {"type": "text", "text": {"content": "text]() empty URL"}, "annotations": {"bold": True}}
+        ]
+        self.assertEqual(result, expected)
+        
+        # Incomplete link pattern - should be treated as regular text
+        result = parse_rich_text("**Bold with [text] no parentheses**")
+        expected = [
+            {"type": "text", "text": {"content": "Bold with [text] no parentheses"}, "annotations": {"bold": True}}
+        ]
+        self.assertEqual(result, expected)
 
 
 class TestMarkdownToNotionBlocks(unittest.TestCase):
@@ -363,6 +471,64 @@ This is a paragraph."""
         
         self.assertEqual(result[5]["type"], "heading_3")
         self.assertEqual(result[5]["heading_3"]["rich_text"][0]["text"]["content"], "Deepest Section")
+    
+    def test_bullet_point_with_bold_timestamp_link(self):
+        """Test the full pipeline for bullet points with bold timestamp links."""
+        # This tests the exact scenario from the bug report
+        markdown = "*   **Parenting Advice [01:16-01:49](https://www.youtube.com/watch?v=8fVHFt7Shf4&t=76s):** Alex uses Claude to get an objective perspective."
+        
+        result = markdown_to_notion_blocks(markdown)
+        
+        # Should have 1 bulleted list item
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["type"], "bulleted_list_item")
+        
+        # Check the rich text structure
+        rich_text = result[0]["bulleted_list_item"]["rich_text"]
+        self.assertEqual(len(rich_text), 4)  # "Parenting Advice ", "01:16-01:49" (link), ":", " Alex uses..."
+        
+        # First part: "Parenting Advice " (bold)
+        self.assertEqual(rich_text[0]["text"]["content"], "Parenting Advice ")
+        self.assertEqual(rich_text[0]["annotations"]["bold"], True)
+        self.assertNotIn("link", rich_text[0]["text"])
+        
+        # Second part: "01:16-01:49" (bold + link)
+        self.assertEqual(rich_text[1]["text"]["content"], "01:16-01:49")
+        self.assertEqual(rich_text[1]["annotations"]["bold"], True)
+        self.assertEqual(rich_text[1]["text"]["link"]["url"], "https://www.youtube.com/watch?v=8fVHFt7Shf4&t=76s")
+        
+        # Third part: ":" (bold)
+        self.assertEqual(rich_text[2]["text"]["content"], ":")
+        self.assertEqual(rich_text[2]["annotations"]["bold"], True)
+        self.assertNotIn("link", rich_text[2]["text"])
+        
+        # Fourth part: " Alex uses..." (regular text)
+        self.assertEqual(rich_text[3]["text"]["content"], " Alex uses Claude to get an objective perspective.")
+        self.assertNotIn("annotations", rich_text[3])
+        self.assertNotIn("link", rich_text[3]["text"])
+    
+    def test_heading_with_link_in_bold_text(self):
+        """Test headings containing bold text with links."""
+        markdown = "### **Section with [link](https://example.com)**"
+        
+        result = markdown_to_notion_blocks(markdown)
+        
+        # Should have 1 heading_3 block
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["type"], "heading_3")
+        
+        # Check the rich text structure
+        rich_text = result[0]["heading_3"]["rich_text"]
+        self.assertEqual(len(rich_text), 2)  # "Section with ", "link"
+        
+        # First part: "Section with " (bold)
+        self.assertEqual(rich_text[0]["text"]["content"], "Section with ")
+        self.assertEqual(rich_text[0]["annotations"]["bold"], True)
+        
+        # Second part: "link" (bold + link)
+        self.assertEqual(rich_text[1]["text"]["content"], "link")
+        self.assertEqual(rich_text[1]["annotations"]["bold"], True)
+        self.assertEqual(rich_text[1]["text"]["link"]["url"], "https://example.com")
 
 
 if __name__ == '__main__':

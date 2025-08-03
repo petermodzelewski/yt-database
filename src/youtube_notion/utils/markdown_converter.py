@@ -12,8 +12,8 @@ def parse_rich_text(text):
     
     Supports:
     - Links: [text](url)
-    - Bold: **text**
-    - Italic: *text*
+    - Bold: **text** (can contain links)
+    - Italic: *text* (can contain links)
     """
     rich_text = []
     i = 0
@@ -50,25 +50,55 @@ def parse_rich_text(text):
             i += link_match.end()
             continue
         
-        # Look for bold text **text**
+        # Look for bold text **text** (may contain links)
         bold_match = re.match(r'\*\*([^*]+)\*\*', text[i:])
         if bold_match:
-            rich_text.append({
-                "type": "text",
-                "text": {"content": bold_match.group(1)},
-                "annotations": {"bold": True}
-            })
+            bold_content = bold_match.group(1)
+            
+            # Check if bold content contains links
+            if '[' in bold_content and '](' in bold_content:
+                # Parse the bold content recursively for links
+                bold_rich_text = parse_rich_text(bold_content)
+                # Apply bold formatting to all parts
+                for part in bold_rich_text:
+                    if 'annotations' not in part:
+                        part['annotations'] = {}
+                    part['annotations']['bold'] = True
+                    rich_text.append(part)
+            else:
+                # Simple bold text without links
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": bold_content},
+                    "annotations": {"bold": True}
+                })
+            
             i += bold_match.end()
             continue
         
-        # Look for italic text *text*
+        # Look for italic text *text* (may contain links)
         italic_match = re.match(r'\*([^*]+)\*', text[i:])
         if italic_match:
-            rich_text.append({
-                "type": "text",
-                "text": {"content": italic_match.group(1)},
-                "annotations": {"italic": True}
-            })
+            italic_content = italic_match.group(1)
+            
+            # Check if italic content contains links
+            if '[' in italic_content and '](' in italic_content:
+                # Parse the italic content recursively for links
+                italic_rich_text = parse_rich_text(italic_content)
+                # Apply italic formatting to all parts
+                for part in italic_rich_text:
+                    if 'annotations' not in part:
+                        part['annotations'] = {}
+                    part['annotations']['italic'] = True
+                    rich_text.append(part)
+            else:
+                # Simple italic text without links
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": italic_content},
+                    "annotations": {"italic": True}
+                })
+            
             i += italic_match.end()
             continue
         
