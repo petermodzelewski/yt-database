@@ -1,23 +1,46 @@
-# Product Overview
+---
+inclusion: always
+---
 
-YouTube to Notion Database Integration is a Python application that automatically processes YouTube videos and adds AI-generated summaries to a Notion database with proper markdown formatting and rich text conversion.
+# Product Guidelines
 
-## Core Features
+YouTube-to-Notion Integration processes YouTube videos and creates AI-generated summaries in Notion databases with rich formatting and embedded content.
 
-- **Dynamic YouTube Processing**: Process any YouTube video URL with AI-generated summaries using Google Gemini
-- **Embedded Videos**: Automatically embeds YouTube videos at the top of each page
-- **Smart Timestamps**: Converts timestamps like `[8:05]` or `[8:05-8:24]` to clickable YouTube links
-- **Markdown to Notion**: Converts markdown summaries to Notion's rich text format
-- **Rich Formatting**: Supports headers, bullet points, numbered lists, bold, and italic text
-- **Cover Images**: Automatically adds video thumbnails as page covers
-- **Dual Mode Operation**: Supports both example data mode and live YouTube processing
-- **Robust Error Handling**: Comprehensive error handling with retry logic and graceful fallbacks
+## Core Product Rules
 
-## Operation Modes
+### Content Processing Standards
+- **Video Embedding**: Always embed YouTube videos at the top of Notion pages using video blocks
+- **Thumbnail Covers**: Set video thumbnails as page cover images for visual consistency
+- **Timestamp Linking**: Convert `[8:05]` or `[8:05-8:24]` patterns to clickable YouTube timestamp URLs
+- **Rich Text Conversion**: Transform markdown summaries to Notion's rich text format with proper formatting
 
-1. **YouTube URL Processing Mode**: Process real YouTube videos with AI-generated summaries (requires GEMINI_API_KEY)
-2. **Example Data Mode**: Uses pre-built example data for testing and demonstration (default mode)
+### Operation Modes
+- **Default Mode**: Example data mode (no API keys required) - use for testing and demos
+- **YouTube Mode**: Live processing with GEMINI_API_KEY - requires valid API configuration
+- **Mode Validation**: Validate required environment variables based on selected mode
 
-## Target Users
+### Content Quality Standards
+- **AI Summaries**: Generate comprehensive, structured summaries using Google Gemini
+- **Markdown Support**: Handle headers (H1-H3), bullet points, numbered lists, bold, italic formatting
+- **Error Graceful**: Provide meaningful error messages with troubleshooting guidance
+- **Fallback Strategy**: YouTube API failures should gracefully fall back to web scraping
 
-Developers and content creators who want to organize YouTube learning content in Notion databases with AI-generated summaries and proper formatting.
+### Database Integration Rules
+- **Dynamic Discovery**: Automatically find target Notion databases by name
+- **Page Creation**: Create new pages with consistent structure and formatting
+- **Property Mapping**: Map video metadata to appropriate Notion page properties
+- **Duplicate Prevention**: Check for existing entries before creating new pages
+
+### Conversation Logging Standards
+- **Automatic Logging**: All Gemini API conversations are automatically logged to `chat_logs/` directory
+- **Structured Format**: Logs saved as markdown files with naming pattern `{video_id}_{timestamp}.md`
+- **Complete Context**: Each log includes session info, video metadata, full prompt, and AI response
+- **Privacy Protection**: Chat logs are git-ignored to protect sensitive content
+- **Cleanup Management**: Automatic cleanup of logs older than 30 days
+- **Error Resilience**: Logging failures don't interrupt main processing workflow
+
+### User Experience Principles
+- **Clear Feedback**: Provide progress indicators and success/failure messages
+- **Validation First**: Validate inputs (URLs, API keys) before processing
+- **Helpful Errors**: Include specific troubleshooting steps in error messages
+- **Mode Clarity**: Make operation mode clear to users in CLI help and output

@@ -39,3 +39,4 @@ ENV/
 Thumbs.db
 
 # Chat logs
+chat_logs/
