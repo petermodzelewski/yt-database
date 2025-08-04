@@ -1,13 +1,20 @@
 """
 Integration test to verify the markdown converter works with EXAMPLE_DATA.
+
+This test uses .env-test configuration exclusively.
 """
 
+import pytest
 from youtube_notion.utils.markdown_converter import markdown_to_notion_blocks
 from youtube_notion.config.example_data import EXAMPLE_DATA
 
 
-def test_example_data_conversion():
+@pytest.mark.integration
+def test_example_data_conversion(integration_config):
     """Test that EXAMPLE_DATA converts properly to Notion blocks."""
+    # Verify we're using test configuration
+    assert integration_config['test_mode'] is True, "Should be running in test mode"
+    
     summary = EXAMPLE_DATA["Summary"]
     blocks = markdown_to_notion_blocks(summary)
     

@@ -188,13 +188,13 @@ class TestYouTubeAPIErrorHandling:
         )
         http_error.error_details = [{"reason": "quotaExceeded", "message": "Quota exceeded"}]
         
-        with patch('src.youtube_notion.processors.youtube_processor.build') as mock_build:
+        with patch('src.youtube_notion.extractors.video_metadata_extractor.build') as mock_build:
             mock_youtube = Mock()
             mock_build.return_value = mock_youtube
             mock_youtube.videos().list().execute.side_effect = http_error
             
             with pytest.raises(QuotaExceededError) as exc_info:
-                processor._get_metadata_via_api("test_video_id")
+                processor.metadata_extractor._get_metadata_via_api("dQw4w9WgXcQ")
             
             assert "YouTube API quota exceeded" in str(exc_info.value)
             assert exc_info.value.api_name == "YouTube Data API"
@@ -213,13 +213,13 @@ class TestYouTubeAPIErrorHandling:
         )
         http_error.error_details = [{"message": "Rate limit exceeded"}]
         
-        with patch('src.youtube_notion.processors.youtube_processor.build') as mock_build:
+        with patch('src.youtube_notion.extractors.video_metadata_extractor.build') as mock_build:
             mock_youtube = Mock()
             mock_build.return_value = mock_youtube
             mock_youtube.videos().list().execute.side_effect = http_error
             
             with pytest.raises(QuotaExceededError) as exc_info:
-                processor._get_metadata_via_api("test_video_id")
+                processor.metadata_extractor._get_metadata_via_api("dQw4w9WgXcQ")
             
             assert "rate limit exceeded" in str(exc_info.value).lower()
             assert exc_info.value.quota_type == "rate_limit"
@@ -237,13 +237,13 @@ class TestYouTubeAPIErrorHandling:
         )
         http_error.error_details = [{"message": "Invalid API key"}]
         
-        with patch('src.youtube_notion.processors.youtube_processor.build') as mock_build:
+        with patch('src.youtube_notion.extractors.video_metadata_extractor.build') as mock_build:
             mock_youtube = Mock()
             mock_build.return_value = mock_youtube
             mock_youtube.videos().list().execute.side_effect = http_error
             
             with pytest.raises(APIError) as exc_info:
-                processor._get_metadata_via_api("test_video_id")
+                processor.metadata_extractor._get_metadata_via_api("dQw4w9WgXcQ")
             
             assert "authentication failed" in str(exc_info.value).lower()
             assert "Check your API key" in str(exc_info.value)
@@ -261,16 +261,16 @@ class TestYouTubeAPIErrorHandling:
         )
         http_error.error_details = [{"message": "Video not found"}]
         
-        with patch('src.youtube_notion.processors.youtube_processor.build') as mock_build:
+        with patch('src.youtube_notion.extractors.video_metadata_extractor.build') as mock_build:
             mock_youtube = Mock()
             mock_build.return_value = mock_youtube
             mock_youtube.videos().list().execute.side_effect = http_error
             
             with pytest.raises(VideoUnavailableError) as exc_info:
-                processor._get_metadata_via_api("test_video_id")
+                processor.metadata_extractor._get_metadata_via_api("dQw4w9WgXcQ")
             
             assert "Video not found" in str(exc_info.value)
-            assert exc_info.value.video_id == "test_video_id"
+            assert exc_info.value.video_id == "dQw4w9WgXcQ"
 
 
 class TestWebScrapingErrorHandling:
@@ -281,32 +281,32 @@ class TestWebScrapingErrorHandling:
         """Create a YouTubeProcessor instance without YouTube API key."""
         return YouTubeProcessor.from_api_keys(gemini_api_key="test_gemini_key")
     
-    @patch('src.youtube_notion.processors.youtube_processor.requests.get')
+    @patch('src.youtube_notion.extractors.video_metadata_extractor.requests.get')
     def test_web_scraping_timeout_error(self, mock_get, processor):
         """Test handling of timeout errors during web scraping."""
         mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
         
         with pytest.raises(APIError) as exc_info:
-            processor._get_metadata_via_scraping("test_video_id")
+            processor.metadata_extractor._get_metadata_via_scraping("dQw4w9WgXcQ")
         
         error_message = str(exc_info.value)
         assert "Request timed out" in error_message
         assert "check network connection" in error_message
         assert exc_info.value.api_name == "Web Scraping"
     
-    @patch('src.youtube_notion.processors.youtube_processor.requests.get')
+    @patch('src.youtube_notion.extractors.video_metadata_extractor.requests.get')
     def test_web_scraping_connection_error(self, mock_get, processor):
         """Test handling of connection errors during web scraping."""
         mock_get.side_effect = requests.exceptions.ConnectionError("Connection failed")
         
         with pytest.raises(APIError) as exc_info:
-            processor._get_metadata_via_scraping("test_video_id")
+            processor.metadata_extractor._get_metadata_via_scraping("dQw4w9WgXcQ")
         
         error_message = str(exc_info.value)
         assert "Connection error" in error_message
         assert "Check your internet connection" in error_message
     
-    @patch('src.youtube_notion.processors.youtube_processor.requests.get')
+    @patch('src.youtube_notion.extractors.video_metadata_extractor.requests.get')
     def test_web_scraping_http_error_429(self, mock_get, processor):
         """Test handling of HTTP 429 (rate limiting) during web scraping."""
         mock_response = Mock()
@@ -316,13 +316,13 @@ class TestWebScrapingErrorHandling:
         mock_get.side_effect = http_error
         
         with pytest.raises(APIError) as exc_info:
-            processor._get_metadata_via_scraping("test_video_id")
+            processor.metadata_extractor._get_metadata_via_scraping("dQw4w9WgXcQ")
         
         error_message = str(exc_info.value)
         assert "HTTP error 429" in error_message
         assert "rate limiting" in error_message
     
-    @patch('src.youtube_notion.processors.youtube_processor.requests.get')
+    @patch('src.youtube_notion.extractors.video_metadata_extractor.requests.get')
     def test_web_scraping_http_error_403_404(self, mock_get, processor):
         """Test handling of HTTP 403/404 errors during web scraping."""
         for status_code in [403, 404]:
@@ -333,7 +333,7 @@ class TestWebScrapingErrorHandling:
             mock_get.side_effect = http_error
             
             with pytest.raises(APIError) as exc_info:
-                processor._get_metadata_via_scraping("test_video_id")
+                processor.metadata_extractor._get_metadata_via_scraping("dQw4w9WgXcQ")
             
             error_message = str(exc_info.value)
             assert f"HTTP error {status_code}" in error_message

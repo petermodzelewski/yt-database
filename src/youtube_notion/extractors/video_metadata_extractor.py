@@ -18,7 +18,8 @@ from ..utils.exceptions import (
     APIError,
     VideoUnavailableError,
     QuotaExceededError,
-    MetadataExtractionError
+    MetadataExtractionError,
+    ConfigurationError
 )
 
 
@@ -40,9 +41,58 @@ class VideoMetadataExtractor:
         Args:
             youtube_api_key: YouTube Data API key for metadata extraction (optional)
             timeout_seconds: Timeout for web scraping requests (default: 10)
+            
+        Raises:
+            ConfigurationError: If configuration parameters are invalid
         """
+        # Validate configuration parameters
+        if timeout_seconds <= 0:
+            raise ConfigurationError(
+                "Timeout seconds must be positive",
+                details=f"Received: {timeout_seconds}"
+            )
+        
         self.youtube_api_key = youtube_api_key
         self.timeout_seconds = timeout_seconds
+    
+    def validate_configuration(self) -> bool:
+        """
+        Validate that the metadata extractor is properly configured.
+        
+        Returns:
+            bool: True if configuration is valid, False otherwise
+            
+        Raises:
+            ConfigurationError: If configuration validation fails
+        """
+        try:
+            # Validate timeout
+            if self.timeout_seconds <= 0:
+                raise ConfigurationError("Timeout seconds must be positive")
+            
+            # If YouTube API key is provided, validate it's not empty
+            if self.youtube_api_key is not None and not self.youtube_api_key.strip():
+                raise ConfigurationError("YouTube API key cannot be empty if provided")
+            
+            # Test YouTube API key if provided (without making actual API call)
+            if self.youtube_api_key:
+                try:
+                    # Just test that we can create the YouTube service
+                    build('youtube', 'v3', developerKey=self.youtube_api_key, cache_discovery=False)
+                except Exception as e:
+                    raise ConfigurationError(
+                        f"Invalid YouTube API key or service initialization failed: {str(e)}",
+                        details="Verify your YouTube Data API key is valid and has necessary permissions"
+                    )
+            
+            return True
+            
+        except ConfigurationError:
+            raise
+        except Exception as e:
+            raise ConfigurationError(
+                f"Configuration validation failed: {str(e)}"
+            )
     
     def validate_url(self, url: str) -> bool:
         """

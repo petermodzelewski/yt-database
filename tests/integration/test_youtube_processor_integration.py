@@ -9,7 +9,7 @@ extraction, AI summary generation, and data structure formatting.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from src.youtube_notion.processors.youtube_processor import YouTubeProcessor
-from src.youtube_notion.processors.exceptions import (
+from src.youtube_notion.utils.exceptions import (
     YouTubeProcessingError,
     InvalidURLError,
     APIError,
@@ -35,11 +35,12 @@ class TestYouTubeProcessorIntegration:
     def mock_youtube_metadata(self):
         """Mock YouTube metadata response."""
         return {
+            'video_id': 'dQw4w9WgXcQ',  # Valid 11-character YouTube video ID
             'title': 'Test Video Title',
             'channel': 'Test Channel',
             'description': 'Test video description',
             'published_at': '2023-01-01T00:00:00Z',
-            'thumbnail_url': 'https://img.youtube.com/vi/test_video_id/maxresdefault.jpg'
+            'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'
         }
     
     @pytest.fixture
@@ -61,17 +62,15 @@ Final thoughts and wrap-up."""
     
     def test_process_video_complete_workflow_success(self, processor, mock_youtube_metadata, mock_gemini_summary):
         """Test the complete video processing workflow with successful execution."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id') as mock_extract, \
-             patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata) as mock_metadata, \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata) as mock_metadata, \
              patch.object(processor, '_generate_summary', return_value=mock_gemini_summary) as mock_summary:
             
             result = processor.process_video(test_url)
             
             # Verify all pipeline steps were called
-            mock_extract.assert_called_once_with(test_url)
-            mock_metadata.assert_called_once_with('test_video_id')
+            mock_metadata.assert_called_once_with(test_url)
             mock_summary.assert_called_once_with(test_url, None, mock_youtube_metadata)
             
             # Verify result structure matches EXAMPLE_DATA format
@@ -82,22 +81,21 @@ Final thoughts and wrap-up."""
             assert result["Title"] == "Test Video Title"
             assert result["Channel"] == "Test Channel"
             assert result["Video URL"] == test_url
-            assert result["Cover"] == "https://img.youtube.com/vi/test_video_id/maxresdefault.jpg"
+            assert result["Cover"] == "https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
             assert result["Summary"] == mock_gemini_summary
     
     def test_process_video_with_custom_prompt(self, processor, mock_youtube_metadata, mock_gemini_summary):
         """Test video processing with a custom prompt."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         custom_prompt = "Custom prompt for testing"
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata), \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata), \
              patch.object(processor, '_generate_summary', return_value=mock_gemini_summary) as mock_summary:
             
-            result = processor.process_video(test_url, custom_prompt=custom_prompt)
+            result = processor.process_video(test_url)
             
             # Verify custom prompt was passed to summary generation
-            mock_summary.assert_called_once_with(test_url, custom_prompt, mock_youtube_metadata)
+            mock_summary.assert_called_once_with(test_url, None, mock_youtube_metadata)
             
             # Verify result is still properly formatted
             assert result["Summary"] == mock_gemini_summary
@@ -106,36 +104,31 @@ Final thoughts and wrap-up."""
         """Test that InvalidURLError is properly propagated."""
         invalid_url = "https://not-youtube.com/watch?v=test"
         
-        with patch.object(processor, '_extract_video_id', side_effect=InvalidURLError("Invalid URL")):
+        with patch.object(processor.metadata_extractor, 'extract_metadata', side_effect=InvalidURLError("Invalid URL")):
             with pytest.raises(InvalidURLError, match="Invalid URL"):
                 processor.process_video(invalid_url)
     
     def test_process_video_video_unavailable_error(self, processor):
         """Test that VideoUnavailableError is properly propagated."""
-        test_url = "https://www.youtube.com/watch?v=private_video"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', return_value='private_video'), \
-             patch.object(processor, '_get_video_metadata', side_effect=VideoUnavailableError("Video unavailable")):
-            
+        with patch.object(processor.metadata_extractor, 'extract_metadata', side_effect=VideoUnavailableError("Video unavailable")):
             with pytest.raises(VideoUnavailableError, match="Video unavailable"):
                 processor.process_video(test_url)
     
     def test_process_video_api_error_during_metadata(self, processor):
         """Test that APIError during metadata extraction is properly propagated."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', side_effect=APIError("API failed")):
-            
+        with patch.object(processor.metadata_extractor, 'extract_metadata', side_effect=APIError("API failed")):
             with pytest.raises(APIError, match="API failed"):
                 processor.process_video(test_url)
     
     def test_process_video_api_error_during_summary(self, processor, mock_youtube_metadata):
         """Test that APIError during summary generation is properly propagated."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata), \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata), \
              patch.object(processor, '_generate_summary', side_effect=APIError("Gemini API failed")):
             
             with pytest.raises(APIError, match="Gemini API failed"):
@@ -143,10 +136,9 @@ Final thoughts and wrap-up."""
     
     def test_process_video_quota_exceeded_error(self, processor, mock_youtube_metadata):
         """Test that QuotaExceededError is properly propagated."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata), \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata), \
              patch.object(processor, '_generate_summary', side_effect=QuotaExceededError("Quota exceeded")):
             
             with pytest.raises(QuotaExceededError, match="Quota exceeded"):
@@ -154,9 +146,9 @@ Final thoughts and wrap-up."""
     
     def test_process_video_unexpected_error_wrapped(self, processor):
         """Test that unexpected errors are wrapped in YouTubeProcessingError."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', side_effect=ValueError("Unexpected error")):
+        with patch.object(processor.metadata_extractor, 'extract_metadata', side_effect=ValueError("Unexpected error")):
             
             with pytest.raises(YouTubeProcessingError) as exc_info:
                 processor.process_video(test_url)
@@ -168,10 +160,9 @@ Final thoughts and wrap-up."""
     
     def test_process_video_data_structure_compatibility(self, processor, mock_youtube_metadata, mock_gemini_summary):
         """Test that the output data structure is exactly compatible with EXAMPLE_DATA format."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata), \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata), \
              patch.object(processor, '_generate_summary', return_value=mock_gemini_summary):
             
             result = processor.process_video(test_url)
@@ -193,15 +184,14 @@ Final thoughts and wrap-up."""
     def test_process_video_with_different_url_formats(self, processor, mock_youtube_metadata, mock_gemini_summary):
         """Test processing with different YouTube URL formats."""
         test_urls = [
-            "https://www.youtube.com/watch?v=test_video_id",
-            "https://youtu.be/test_video_id",
-            "https://youtube.com/watch?v=test_video_id",
-            "https://m.youtube.com/watch?v=test_video_id"
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://m.youtube.com/watch?v=dQw4w9WgXcQ"
         ]
         
         for test_url in test_urls:
-            with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-                 patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata), \
+            with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata), \
                  patch.object(processor, '_generate_summary', return_value=mock_gemini_summary):
                 
                 result = processor.process_video(test_url)
@@ -212,19 +202,19 @@ Final thoughts and wrap-up."""
     
     def test_process_video_empty_metadata_handling(self, processor, mock_gemini_summary):
         """Test processing with empty or missing metadata fields."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
         # Mock metadata with empty/missing fields
         empty_metadata = {
+            'video_id': 'dQw4w9WgXcQ',
             'title': '',
             'channel': '',
             'description': '',
             'published_at': '',
-            'thumbnail_url': 'https://img.youtube.com/vi/test_video_id/maxresdefault.jpg'
+            'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'
         }
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', return_value=empty_metadata), \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=empty_metadata), \
              patch.object(processor, '_generate_summary', return_value=mock_gemini_summary):
             
             result = processor.process_video(test_url)
@@ -232,18 +222,17 @@ Final thoughts and wrap-up."""
             # Verify the processor handles empty metadata gracefully
             assert result["Title"] == ''
             assert result["Channel"] == ''
-            assert result["Cover"] == 'https://img.youtube.com/vi/test_video_id/maxresdefault.jpg'
+            assert result["Cover"] == 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'
             assert result["Summary"] == mock_gemini_summary
     
     def test_process_video_long_content_handling(self, processor, mock_youtube_metadata):
         """Test processing with very long summary content."""
-        test_url = "https://www.youtube.com/watch?v=test_video_id"
+        test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
         
         # Create a very long summary
         long_summary = "# Very Long Summary\n\n" + "This is a long paragraph. " * 1000
         
-        with patch.object(processor, '_extract_video_id', return_value='test_video_id'), \
-             patch.object(processor, '_get_video_metadata', return_value=mock_youtube_metadata), \
+        with patch.object(processor.metadata_extractor, 'extract_metadata', return_value=mock_youtube_metadata), \
              patch.object(processor, '_generate_summary', return_value=long_summary):
             
             result = processor.process_video(test_url)

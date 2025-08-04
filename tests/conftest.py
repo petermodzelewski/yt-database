@@ -7,10 +7,15 @@ import os
 import pytest
 from unittest.mock import Mock
 
-# Load environment variables from .env file for integration tests
+# Load environment variables from .env file for unit tests only
+# Integration tests have their own configuration in integration/conftest.py
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    import os
+    
+    # Only load .env for unit tests, not integration tests
+    if not os.getenv('TEST_MODE'):
+        load_dotenv()
 except ImportError:
     # dotenv not available, skip loading
     pass

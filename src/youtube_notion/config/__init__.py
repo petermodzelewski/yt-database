@@ -16,6 +16,7 @@ from .settings import (
     print_configuration_error,
     load_custom_prompt
 )
+from .factory import ComponentFactory
 
 __all__ = [
     'ApplicationConfig',
@@ -26,5 +27,6 @@ __all__ = [
     'validate_environment_variables',
     'get_configuration_help',
     'print_configuration_error',
-    'load_custom_prompt'
+    'load_custom_prompt',
+    'ComponentFactory'
 ]
