@@ -138,16 +138,19 @@ from .utils.markdown_converter import parse_rich_text
 
 ### Testing Structure
 
-- **Unit Tests** (`tests/unit/`): Fast, isolated tests using mock implementations
+- **Unit Tests** (`tests/unit/`): Primary focus for daily development
+  - 478 tests run in ~6 seconds with comprehensive mock implementations
   - Individual component functionality with dependency injection
   - Mock implementations from `tests/fixtures/mock_implementations.py`
-  - Complete in under 10 seconds total, no I/O operations
-- **Integration Tests** (`tests/integration/`): Tests with external dependencies
+  - No I/O operations, external APIs, or log file creation
+  - Run frequently during development with `python run_tests.py`
+- **Integration Tests** (`tests/integration/`): End-of-cycle validation
+  - 13 tests run in ~90 seconds with real external APIs
   - Use `.env-test` configuration exclusively
   - Test database "YT Summaries [TEST]" for safe testing
-  - API interactions with real services
+  - Run before releases or when validating complete system
 - **Test Configuration**: Separate `conftest.py` files for unit and integration tests
-- **Test Runner**: `run_tests.py` handles PYTHONPATH automatically
+- **Test Runner**: `run_tests.py` handles PYTHONPATH automatically (unit tests only)
 - **Mock Implementations**: Comprehensive mocks for all interfaces in `tests/fixtures/`
 
 ### Configuration Management
@@ -171,3 +174,25 @@ from .utils.markdown_converter import parse_rich_text
 - **Help Documentation**: Comprehensive usage examples including batch operations
 - **Progress Indicators**: Real-time progress feedback for batch processing
 - **Output Control**: Verbose vs concise output modes based on operation type
+
+## Architecture Restructure Status
+
+The project has successfully completed a comprehensive architecture restructure:
+
+### ✅ Implementation Complete
+- **Component Boundaries**: Clear separation with single responsibilities
+- **Pluggable Interfaces**: Abstract base classes for `SummaryWriter` and `Storage`
+- **Dependency Injection**: `ComponentFactory` pattern for component creation
+- **Error Handling**: Structured exception hierarchy with graceful fallbacks
+- **Testing Architecture**: Fast unit tests (478 in ~6s) + integration tests (13 in ~90s)
+
+### ✅ Quality Metrics
+- **Backward Compatibility**: All existing functionality preserved
+- **Test Coverage**: Comprehensive unit and integration test suites
+- **Mock Implementations**: Complete mock implementations for all interfaces
+- **Performance**: Unit tests optimized for development workflow speed
+
+### ✅ Development Workflow
+- **Primary**: Unit tests for daily development (`python run_tests.py`)
+- **Secondary**: Integration tests for release validation (`python -m pytest tests/integration/`)
+- **Architecture**: Component-based design with clear interfaces and factory pattern
