@@ -346,6 +346,40 @@ class TestGeminiAPICall:
                     prompt="Test prompt"
                 )
 
+    def test_call_gemini_api_uses_file_data(self, mock_writer):
+        """Test that the Gemini API call uses FileData for the video URL."""
+        mock_client = Mock()
+        mock_client.models.generate_content_stream.return_value = [Mock(text="response")]
+
+        with patch('src.youtube_notion.writers.gemini_summary_writer.genai.Client', return_value=mock_client) as mock_genai_client:
+            mock_writer._call_gemini_api(
+                video_url="https://youtube.com/watch?v=test_id",
+                prompt="Test prompt"
+            )
+
+            mock_genai_client.assert_called_once_with(api_key=mock_writer.api_key)
+
+            call_args, call_kwargs = mock_client.models.generate_content_stream.call_args
+
+            # Check the 'contents' argument
+            contents = call_kwargs.get('contents')
+            assert contents is not None
+            assert len(contents) == 1
+
+            # Check the parts of the content
+            parts = contents[0].parts
+            assert len(parts) == 2
+
+            # Check the FileData part
+            file_part = parts[0]
+            assert file_part.file_data is not None
+            assert file_part.file_data.file_uri == "https://youtube.com/watch?v=test_id"
+            assert file_part.file_data.mime_type == "video/*"
+
+            # Check the text part
+            text_part = parts[1]
+            assert text_part.text == "Test prompt"
+
 
 class TestRetryLogic:
     """Test retry logic and error handling."""
