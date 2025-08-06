@@ -6,14 +6,26 @@ Supports both example data mode and dynamic YouTube video processing with AI-gen
 
 import sys
 from typing import Optional, Dict, Any
-from notion_client import Client
+# Removed unused import: from notion_client import Client
 
-from .notion_db.operations import find_database_by_name, add_youtube_entry
+# Legacy imports removed - using new architecture components
 from .config.example_data import EXAMPLE_DATA
 from .config import (
     ApplicationConfig,
-    ConfigurationError,
     print_configuration_error
+)
+from .config.factory import ComponentFactory
+from .processors.video_processor import VideoProcessor
+from .utils.exceptions import (
+    VideoProcessingError,
+    MetadataExtractionError,
+    SummaryGenerationError,
+    StorageError,
+    InvalidURLError,
+    APIError,
+    ConfigurationError,
+    VideoUnavailableError,
+    QuotaExceededError
 )
 
 
@@ -34,49 +46,30 @@ def load_application_config(youtube_mode: bool = False) -> Optional[ApplicationC
         return None
 
 
-def initialize_notion_client(notion_token: str) -> Optional[Client]:
+
+def find_notion_database(storage, config: ApplicationConfig) -> Optional[str]:
     """
-    Initialize and validate Notion client connection.
+    Find the target Notion database for YouTube summaries using new architecture.
     
     Args:
-        notion_token: Notion API token
-        
-    Returns:
-        Client: Initialized Notion client or None if initialization fails
-    """
-    try:
-        notion = Client(auth=notion_token)
-        # Test the connection by making a simple API call
-        notion.users.me()
-        return notion
-    except Exception as e:
-        print(f"Error: Failed to initialize Notion client: {e}")
-        print("Please verify your NOTION_TOKEN is valid and has the necessary permissions.")
-        return None
-
-
-def find_notion_database(notion: Client, config: ApplicationConfig) -> Optional[str]:
-    """
-    Find the target Notion database for YouTube summaries.
-    
-    Args:
-        notion: Initialized Notion client
+        storage: NotionStorage instance
         config: Application configuration
         
     Returns:
         str: Database ID or None if not found
     """
     try:
-        database_id = find_database_by_name(
-            notion, 
-            config.notion.database_name, 
-            config.notion.parent_page_name
-        )
+        database_id = storage.find_target_location()
         if not database_id:
-            print(f"Error: Could not find '{config.notion.database_name}' database in '{config.notion.parent_page_name}' page")
+            print(f"Error: Could not find '{config.notion.database_name}' database")
+            if config.notion.parent_page_name:
+                print(f"in '{config.notion.parent_page_name}' page")
             print("\nPlease ensure:")
-            print(f"  1. You have a page named '{config.notion.parent_page_name}'")
-            print(f"  2. That page contains a database named '{config.notion.database_name}'")
+            if config.notion.parent_page_name:
+                print(f"  1. You have a page named '{config.notion.parent_page_name}'")
+                print(f"  2. That page contains a database named '{config.notion.database_name}'")
+            else:
+                print(f"  1. You have a database named '{config.notion.database_name}'")
             print("  3. Your Notion integration has access to both the page and database")
             return None
         return database_id
@@ -87,55 +80,48 @@ def find_notion_database(notion: Client, config: ApplicationConfig) -> Optional[
 
 def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig, batch_mode: bool = False) -> Optional[Dict[str, Any]]:
     """
-    Process a YouTube video using the YouTubeProcessor.
+    Process a YouTube video using the new VideoProcessor architecture.
+    
+    This function maintains backward compatibility with existing tests while
+    using the new component-based architecture internally.
     
     Args:
         youtube_url: YouTube URL to process
         custom_prompt: Optional custom prompt for AI generation
         config: Application configuration
+        batch_mode: If True, reduces verbose output for batch processing
         
     Returns:
         dict: Processed video data or None if processing fails
     """
     try:
-        from .processors.youtube_processor import YouTubeProcessor
-        from .processors.exceptions import (
-            YouTubeProcessingError,
-            InvalidURLError,
-            APIError,
-            VideoUnavailableError,
-            QuotaExceededError
-        )
-    except ImportError as e:
-        print(f"Error: Failed to import YouTube processor - {e}")
-        print("Please ensure all required dependencies are installed:")
-        print("  pip install google-genai google-api-python-client requests")
-        return None
-    
-    try:
-        # Initialize processor with configuration
-        if not config.youtube_processor:
-            print("Error: YouTube processor configuration is missing")
-            return None
+        # Use new architecture components
+        factory = ComponentFactory(config)
         
-        processor = YouTubeProcessor(config.youtube_processor)
+        # Create components individually for backward compatibility
+        metadata_extractor = factory.create_metadata_extractor()
+        summary_writer = factory.create_summary_writer()
         
-        # Validate URL before processing
-        if not processor.validate_youtube_url(youtube_url):
-            print(f"Error: Invalid YouTube URL format: {youtube_url}")
-            print("Supported formats:")
-            print("  - https://www.youtube.com/watch?v=VIDEO_ID")
-            print("  - https://youtu.be/VIDEO_ID")
-            print("  - https://m.youtube.com/watch?v=VIDEO_ID")
-            return None
-        
-        # Process the video
+        # Process the video using individual components
         if not batch_mode:
             print(f"Processing YouTube video: {youtube_url}")
             if custom_prompt:
                 print("Using custom prompt for AI summary generation")
         
-        video_data = processor.process_video(youtube_url, custom_prompt)
+        # Step 1: Extract metadata
+        metadata = metadata_extractor.extract_metadata(youtube_url)
+        
+        # Step 2: Generate summary
+        summary = summary_writer.generate_summary(youtube_url, metadata, custom_prompt)
+        
+        # Step 3: Prepare video data for return (backward compatibility)
+        video_data = {
+            "Title": metadata.get("title", "Unknown Title"),
+            "Channel": metadata.get("channel", "Unknown Channel"),
+            "Video URL": youtube_url,
+            "Cover": metadata.get("thumbnail_url", ""),
+            "Summary": summary
+        }
         
         if not batch_mode:
             print(f"✓ Successfully processed video: {video_data['Title']}")
@@ -149,13 +135,20 @@ def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config
         print(f"Error: Invalid YouTube URL - {e}")
         if hasattr(e, 'details') and e.details:
             print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• Ensure the URL is from YouTube (youtube.com or youtu.be)")
+        print("• Check that the video ID is 11 characters long")
+        print("• Try copying the URL directly from your browser")
         return None
         
     except VideoUnavailableError as e:
         print(f"Error: Video is not available - {e}")
         if hasattr(e, 'details') and e.details:
             print(f"Details: {e.details}")
-        print("The video may be private, deleted, or restricted in your region.")
+        print("\nTroubleshooting:")
+        print("• The video may be private, deleted, or restricted")
+        print("• Check if the video is available in your region")
+        print("• Verify the video URL is correct")
         return None
         
     except QuotaExceededError as e:
@@ -164,55 +157,160 @@ def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config
             print(f"API: {e.api_name}")
         if hasattr(e, 'quota_type'):
             print(f"Quota type: {e.quota_type}")
-        print("Please wait before trying again or check your API usage limits.")
+        if hasattr(e, 'retry_delay_seconds') and e.retry_delay_seconds:
+            print(f"Retry after: {e.retry_delay_seconds + 15} seconds")
+        print("\nTroubleshooting:")
+        print("• Wait before trying again (see retry delay above)")
+        print("• Check your API usage limits in the respective console")
+        print("• Consider upgrading your API plan if needed")
         return None
         
     except APIError as e:
         print(f"Error: API call failed - {e}")
         if hasattr(e, 'api_name'):
             print(f"API: {e.api_name}")
+        if hasattr(e, 'status_code'):
+            print(f"Status code: {e.status_code}")
         if hasattr(e, 'details') and e.details:
             print(f"Details: {e.details}")
+        
+        # Provide specific troubleshooting based on API and error type
+        error_message = str(e).lower()
+        print("\nTroubleshooting:")
+        if 'authentication' in error_message or 'api key' in error_message:
+            print("• Check that your API key is valid and properly configured")
+            print("• Ensure the API key has the necessary permissions")
+            print("• Verify the API key is not expired")
+        elif 'network' in error_message or 'timeout' in error_message:
+            print("• Check your internet connection")
+            print("• Try again in a few moments")
+            print("• Consider increasing timeout settings if available")
+        else:
+            print("• Verify your API configuration")
+            print("• Check the API service status")
+            print("• Try again in a few moments")
         return None
         
-    except YouTubeProcessingError as e:
-        print(f"Error: YouTube processing failed - {e}")
+    except (SummaryGenerationError, MetadataExtractionError, StorageError) as e:
+        error_type = type(e).__name__.replace('Error', '').lower()
+        print(f"Error: {error_type.replace('_', ' ').title()} failed - {e}")
         if hasattr(e, 'details') and e.details:
             print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• Check your configuration settings")
+        print("• Verify all required API keys are set")
+        print("• Try again in a few moments")
+        return None
+        
+    except ConfigurationError as e:
+        print(f"Error: Configuration error - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• Check your environment variables (.env file)")
+        print("• Ensure all required configuration is provided")
+        print("• Verify configuration values are valid")
         return None
         
     except Exception as e:
         print(f"Error: Unexpected error during YouTube processing - {e}")
-        print("Please check your configuration and try again.")
+        print(f"Error type: {type(e).__name__}")
+        print("\nTroubleshooting:")
+        print("• Check your configuration and try again")
+        print("• Ensure all dependencies are properly installed")
+        print("• If the problem persists, please report this issue")
         return None
 
 
-def add_to_notion_database(notion: Client, database_id: str, video_data: Dict[str, Any]) -> bool:
+def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig, batch_mode: bool = False) -> bool:
     """
-    Add processed video data to the Notion database.
+    Process a YouTube video using the complete VideoProcessor orchestrator.
+    
+    This function uses the new architecture with full orchestration, including
+    automatic storage. It's designed for future use when we want to leverage
+    the complete new architecture.
     
     Args:
-        notion: Initialized Notion client
-        database_id: Target database ID
+        youtube_url: YouTube URL to process
+        custom_prompt: Optional custom prompt for AI generation
+        config: Application configuration
+        batch_mode: If True, reduces verbose output for batch processing
+        
+    Returns:
+        bool: True if processing completed successfully, False otherwise
+    """
+    try:
+        # Create component factory from configuration
+        factory = ComponentFactory(config)
+        
+        # Create all components using the factory
+        metadata_extractor, summary_writer, storage = factory.create_all_components()
+        
+        # Create video processor orchestrator
+        processor = VideoProcessor(metadata_extractor, summary_writer, storage)
+        
+        # Validate configuration
+        processor.validate_configuration()
+        
+        # Process the video using the new architecture
+        if not batch_mode:
+            print(f"Processing YouTube video: {youtube_url}")
+            if custom_prompt:
+                print("Using custom prompt for AI summary generation")
+        
+        # Process video and get success status
+        success = processor.process_video(youtube_url, custom_prompt)
+        
+        if success:
+            if not batch_mode:
+                print("✓ Video processed and stored successfully")
+            else:
+                print(f"✓ Processed and stored: {youtube_url}")
+        else:
+            print("Error: Video processing failed")
+        
+        return success
+        
+    except VideoProcessingError as e:
+        print(f"Error: Video processing failed - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        return False
+        
+    except ConfigurationError as e:
+        print(f"Error: Configuration error - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        return False
+        
+    except ImportError as e:
+        print(f"Error: Failed to import required components - {e}")
+        print("Please ensure all required dependencies are installed:")
+        print("  pip install google-genai google-api-python-client requests")
+        return False
+        
+    except Exception as e:
+        print(f"Error: Unexpected error during YouTube processing - {e}")
+        print("Please check your configuration and try again.")
+        return False
+
+
+def add_to_notion_database(storage, video_data: Dict[str, Any]) -> bool:
+    """
+    Add processed video data to the Notion database using new architecture.
+    
+    Args:
+        storage: NotionStorage instance
         video_data: Processed video data
         
     Returns:
         bool: True if successful, False otherwise
     """
     try:
-        page_id = add_youtube_entry(
-            notion,
-            database_id,
-            video_data["Title"],
-            video_data["Summary"],
-            video_data["Video URL"],
-            video_data["Channel"],
-            video_data["Cover"]
-        )
+        success = storage.store_video_summary(video_data)
         
-        if page_id:
+        if success:
             print(f"✓ Entry added successfully to Notion database")
-            print(f"✓ Page ID: {page_id}")
             return True
         else:
             print("Error: Failed to add entry to Notion database")
@@ -262,23 +360,27 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None,
     if not batch_mode:
         print("✓ Configuration loaded and validated")
     
-    # Step 2: Initialize Notion client
+    # Step 2: Initialize storage backend
     if not batch_mode:
-        print("\n2. Initializing Notion client...")
-    notion = initialize_notion_client(config.notion.notion_token)
-    if not notion:
+        print("\n2. Initializing storage backend...")
+    try:
+        factory = ComponentFactory(config)
+        storage = factory.create_storage()
+        storage.validate_configuration()
+    except Exception as e:
+        print(f"Error: Failed to initialize storage backend: {e}")
         return False
     if not batch_mode:
-        print("✓ Notion client initialized")
+        print("✓ Storage backend initialized")
     
     # Step 3: Find target database
     if not batch_mode:
         print("\n3. Finding target database...")
-    database_id = find_notion_database(notion, config)
+    database_id = find_notion_database(storage, config)
     if not database_id:
         return False
     if not batch_mode:
-        print("✓ Found 'YT Summaries' database")
+        print("✓ Found target database")
     
     # Step 4: Process video data
     if not batch_mode:
@@ -306,7 +408,7 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None,
     # Step 5: Add to Notion database
     if not batch_mode:
         print("\n5. Adding entry to Notion database...")
-    success = add_to_notion_database(notion, database_id, video_data)
+    success = add_to_notion_database(storage, video_data)
     
     if success:
         if not batch_mode:

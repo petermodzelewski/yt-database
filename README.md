@@ -582,7 +582,7 @@ The system automatically:
 When processing multiple URLs, quota limits don't stop the entire batch:
 
 ```bash
-python youtube_notion_cli.py --file large_batch.txt
+python youtube_notion_cli.py --file urls.txt
 
 # Output:
 [1/10] Processing: https://youtu.be/video1
@@ -758,32 +758,105 @@ The application includes example data from a YouTube video about AI chunking str
 
 ## Testing
 
-First, ensure all dependencies are installed:
+The project includes comprehensive unit and integration test suites to ensure reliability and maintainability.
+
+### Unit Tests
+
+Fast, isolated tests that don't require external APIs:
 
 ```bash
-pip install -r requirements.txt
-```
-
-Run the comprehensive test suite:
-
-```bash
-# Easy way - use the test runner (handles path setup automatically)
+# Run all unit tests (recommended)
 python run_tests.py
 
-# Manual way with pytest (recommended):
-python -m pytest tests/ -v
+# Run with pytest directly
+python -m pytest tests/unit/ -v
 
-# Or install the package in development mode first:
-pip install -e .
-pytest tests/ -v
+# Run specific test categories
+python -m pytest tests/unit/ -m "not slow" -v
 ```
 
-The test runner will automatically:
-- Set up the correct Python path for the package structure
-- Try to use pytest if available
-- Fall back to running tests individually if pytest isn't installed
+### Integration Tests
 
-**Note**: The project now uses a proper Python package structure, eliminating the need for manual path manipulation that was required in the previous version.
+End-to-end tests that verify complete functionality with real APIs:
+
+#### Setup Integration Tests
+
+1. **Create test configuration file** (`.env-test`):
+   ```bash
+   cp .env.example .env-test
+   ```
+
+2. **Update `.env-test` with test API keys**:
+   ```bash
+   # Test environment configuration
+   NOTION_TOKEN=your_test_notion_token_here
+   DATABASE_NAME=YT Summaries [TEST]
+   PARENT_PAGE_NAME=YouTube Summaries [TEST]
+   
+   GEMINI_API_KEY=your_test_gemini_api_key_here
+   YOUTUBE_API_KEY=your_test_youtube_api_key_here
+   
+   TEST_MODE=true
+   ```
+
+3. **Run integration tests**:
+   ```bash
+   # Run all tests (unit + integration)
+   python run_tests.py
+   
+   # Run only unit tests (fast)
+   python run_tests.py --unit
+   
+   # Run only integration tests (requires API keys)
+   python run_tests.py --integration
+   # OR use the dedicated integration test runner
+   python run_integration_tests.py
+   ```
+
+#### Integration Test Features
+
+- **Automatic Database Management**: Creates and cleans test databases
+- **Test Isolation**: Each test runs with a clean database state
+- **Real API Testing**: Tests complete workflows with actual APIs
+- **Error Scenario Testing**: Validates error handling and recovery
+- **Performance Testing**: Ensures reasonable processing times
+
+#### Safety Features
+
+- **Never uses production `.env` file**
+- **Requires `TEST_MODE=true` in `.env-test`**
+- **Uses `[TEST]` naming convention for databases**
+- **Validates API keys are not placeholders**
+- **Automatic cleanup of test data**
+
+### Test Categories
+
+- **Unit Tests** (`tests/unit/`): Fast, isolated component tests
+- **Integration Tests** (`tests/integration/`): End-to-end workflow tests
+- **Performance Tests**: Marked with `@pytest.mark.slow`
+- **API Tests**: Tests requiring external service connections
+
+### Running All Tests
+
+```bash
+# Run unit tests only (fast)
+python run_tests.py
+
+# Run integration tests (requires API keys)
+python run_integration_tests.py
+# OR
+python run_tests.py --integration
+
+# Run all tests with pytest
+python -m pytest tests/ -v
+
+# Run tests by category
+python -m pytest tests/ -m "unit" -v          # Unit tests only
+python -m pytest tests/ -m "integration" -v   # Integration tests only
+python -m pytest tests/ -m "not slow" -v      # Skip slow tests
+```
+
+The test runners automatically handle Python path setup and provide clear feedback about test results and any configuration issues.
 
 ### Benefits of the New Structure
 

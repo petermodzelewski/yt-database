@@ -5,20 +5,8 @@ This module contains processors for handling YouTube video data extraction,
 metadata retrieval, and AI-powered summary generation.
 """
 
-from .youtube_processor import YouTubeProcessor
-from .exceptions import (
-    YouTubeProcessingError,
-    InvalidURLError,
-    APIError,
-    VideoUnavailableError,
-    QuotaExceededError
-)
+from .video_processor import VideoProcessor
 
 __all__ = [
-    'YouTubeProcessor',
-    'YouTubeProcessingError',
-    'InvalidURLError',
-    'APIError',
-    'VideoUnavailableError',
-    'QuotaExceededError'
+    'VideoProcessor'
 ]

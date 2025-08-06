@@ -6,57 +6,57 @@ inclusion: always
 
 YouTube-to-Notion Integration processes YouTube videos and creates AI-generated summaries in Notion databases with rich formatting and embedded content.
 
-## Core Product Rules
+## Architecture Patterns
 
-### Content Processing Standards
-- **Video Embedding**: Always embed YouTube videos at the top of Notion pages using video blocks
-- **Thumbnail Covers**: Set video thumbnails as page cover images for visual consistency
-- **Timestamp Linking**: Convert `[8:05]` or `[8:05-8:24]` patterns to clickable YouTube timestamp URLs
-- **Rich Text Conversion**: Transform markdown summaries to Notion's rich text format with proper formatting
+### Component-Based Design
+- Use `ComponentFactory` for dependency injection and component creation
+- All components implement abstract interfaces (`Storage`, `SummaryWriter`)
+- `VideoProcessor` orchestrates the complete processing pipeline
+- Each component validates configuration at initialization
+- Use structured exception hierarchy from `utils/exceptions.py`
 
 ### Operation Modes
-- **Default Mode**: Example data mode (no API keys required) - use for testing and demos
-- **YouTube Mode**: Live processing with GEMINI_API_KEY - requires valid API configuration
-- **Mode Validation**: Validate required environment variables based on selected mode
+- **Default**: Example data mode (no API keys required)
+- **YouTube**: Live processing with `GEMINI_API_KEY` 
+- **Test**: Integration tests use `.env-test` with "YT Summaries [TEST]" database
 
-### Content Quality Standards
-- **AI Summaries**: Generate comprehensive, structured summaries using Google Gemini
-- **Markdown Support**: Handle headers (H1-H3), bullet points, numbered lists, bold, italic formatting
-- **Error Graceful**: Provide meaningful error messages with troubleshooting guidance
-- **Fallback Strategy**: YouTube API failures should gracefully fall back to web scraping
+## Content Standards
 
-### Database Integration Rules
-- **Dynamic Discovery**: Automatically find target Notion databases by name
-- **Page Creation**: Create new pages with consistent structure and formatting
-- **Property Mapping**: Map video metadata to appropriate Notion page properties
-- **Duplicate Prevention**: Check for existing entries before creating new pages
+### Notion Page Structure
+- Embed YouTube video at top using video blocks
+- Set video thumbnail as page cover image
+- Convert `[8:05]` timestamps to clickable YouTube URLs
+- Transform markdown to Notion rich text format
 
-### Conversation Logging Standards
-- **Automatic Logging**: All Gemini API conversations are automatically logged to `chat_logs/` directory
-- **Structured Format**: Logs saved as markdown files with naming pattern `{video_id}_{timestamp}.md`
-- **Complete Context**: Each log includes session info, video metadata, full prompt, and AI response
-- **Privacy Protection**: Chat logs are git-ignored to protect sensitive content
-- **Cleanup Management**: Automatic cleanup of logs older than 30 days
-- **Error Resilience**: Logging failures don't interrupt main processing workflow
+### AI Summary Requirements
+- Use `GeminiSummaryWriter` for structured summaries
+- Support streaming responses with progress indicators
+- Handle markdown: headers (H1-H3), lists, bold, italic
+- Automatic conversation logging to `chat_logs/` directory
 
-### Batch Processing Standards
-- **Multiple URLs**: Support processing multiple YouTube URLs in a single operation
-- **Progress Tracking**: Show progress indicators for batch operations (e.g., "Processing 3/10...")
-- **Error Resilience**: Continue processing remaining URLs even if some fail
-- **Batch Reporting**: Provide summary of successful/failed operations at completion
-- **Intelligent Quota Management**: Parse `retryDelay` from API responses and wait appropriately
-- **Smart Retry Logic**: Wait for API-specified delay + 15 second buffer before retrying
-- **Progress Feedback**: Show clear messages during quota waits (e.g., "Waiting 33 seconds before retry...")
-- **Test Mode Optimization**: Cap retry delays to 5 seconds during testing to prevent hangs
-- **Reduced Verbosity**: Use concise output in batch mode to avoid overwhelming logs
-- **Resume Capability**: Support resuming interrupted batch operations
+### Batch Processing
+- Support multiple URLs with progress tracking ("Processing 3/10...")
+- Continue processing on individual failures
+- Parse API `retryDelay` responses and wait appropriately
+- Cap retry delays to 5 seconds during testing
+- Use concise output in batch mode
 
-### User Experience Principles
-- **Clear Feedback**: Provide progress indicators and success/failure messages
-- **Validation First**: Validate inputs (URLs, API keys) before processing
-- **Helpful Errors**: Include specific troubleshooting steps in error messages
-- **Mode Clarity**: Make operation mode clear to users in CLI help and output
-- **Batch Efficiency**: Minimize redundant operations (database lookups, client initialization) in batch mode
-- **Quota Transparency**: Show clear messages when waiting for API quota limits (e.g., "Waiting 33 seconds...")
-- **Resilient Processing**: Continue batch operations even when individual URLs hit quota limits
-- **Test-Friendly**: Automatically detect test environments and cap delays to prevent hangs
+## Quality Standards
+
+### Error Handling
+- Return boolean success indicators from main functions
+- Use specific exceptions: `VideoProcessingError`, `ConfigurationError`, etc.
+- Implement graceful fallbacks (YouTube API → web scraping)
+- Provide user-friendly error messages with troubleshooting context
+
+### Testing Workflow
+- **Primary**: Unit tests for daily development (`python run_tests.py` - 478 tests, ~6s)
+- **Secondary**: Integration tests for releases (`python -m pytest tests/integration/` - 13 tests, ~90s)
+- Use mock implementations from `tests/fixtures/mock_implementations.py`
+- Unit tests must not perform I/O or call external APIs
+
+### Database Integration
+- Use `NotionStorage` implementation of `Storage` interface
+- Automatically discover target databases by name
+- Check for duplicates before creating pages
+- Map video metadata to Notion page properties
