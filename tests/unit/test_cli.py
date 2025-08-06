@@ -171,6 +171,3 @@ class TestCLIIntegration:
             youtube_notion_cli.main_cli()
             mock_main.assert_called_once_with(youtube_url=test_url, custom_prompt=test_prompt)
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
