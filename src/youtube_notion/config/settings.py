@@ -102,7 +102,14 @@ class ApplicationConfig:
             ConfigurationError: If required environment variables are missing or invalid
         """
         # Load environment variables
-        load_dotenv()
+        # Check if we're in test mode (set by integration test conftest.py)
+        if os.getenv('TEST_MODE') == 'true':
+            # In test mode, .env-test should already be loaded by conftest.py
+            # Don't load .env to avoid overriding test configuration
+            pass
+        else:
+            # In normal mode, load .env file
+            load_dotenv()
         
         # Validate and collect environment variables
         env_vars = validate_environment_variables(youtube_mode)

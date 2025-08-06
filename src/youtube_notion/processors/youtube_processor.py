@@ -301,18 +301,17 @@ class YouTubeProcessor:
             client = genai.Client(api_key=self.gemini_api_key)
             model = self.config.gemini_model
             
-            # Prepare content for the API call
+            # Prepare content for the API call - pass YouTube URL directly as text
+            # The newer Gemini models can process YouTube URLs when provided as text
+            full_prompt = f"""Please analyze this YouTube video: {video_url}
+
+{prompt}"""
+            
             contents = [
                 types.Content(
                     role="user",
                     parts=[
-                        types.Part(
-                            file_data=types.FileData(
-                                file_uri=video_url,
-                                mime_type="video/*"
-                            )
-                        ),
-                        types.Part.from_text(text=prompt)
+                        types.Part.from_text(text=full_prompt)
                     ]
                 )
             ]
