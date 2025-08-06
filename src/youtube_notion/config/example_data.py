@@ -25,6 +25,10 @@ While agentic search—which uses AI agents to iteratively search, read, and rea
 
 RAG excels at providing fast, consistent, and economical answers when queries map cleanly to specific information [4:31-4:43]. Ultimately, even agentic systems rely on well-structured data, meaning that effective chunking remains a foundational requirement [6:22-6:26].
 
+```python
+print("hello world")
+```
+
 #### 5 Principles for Effective Chunking
 
 To avoid the pitfalls of poor data preparation, follow these five principles:
@@ -40,6 +44,14 @@ To avoid the pitfalls of poor data preparation, follow these five principles:
     *   **Financial Tables:** This is notoriously difficult. A simple row-by-row approach will fail. Instead, chunk by calculable units or even convert tables to natural language descriptions.
 4.  **Size for "Goldilocks" Outcomes** [10:54-11:17]: Find the right chunk size. If chunks are too small, they will lack context. If they are too large, they will be costly and can lead to unfocused answers. The ideal size often falls between 500 and 1000 tokens, but this should be tested against an evaluation set of questions.
 5.  **Remember Overlap** [11:18-11:32]: Overlap is your insurance policy. It is a crucial, yet often underutilized, technique to prevent important information from being lost at chunk boundaries.
+
+
+| Question                                 | When to Use an Agent (Complex) | When to Use a Workflow (Simpler)      |
+| ---------------------------------------- | ------------------------------ | ------------------------------------- |
+| **Is the task complex enough?**          | Yes (Path to goal is unclear)  | No (Clear, step-by-step process)  [8:21]    |
+| **Is the task valuable enough?**         | Yes (High value, e.g., >$1/run) | No (Low value, e.g., <$0.1/run)  [9:12-10:11]     |
+| **Are all parts of the task doable?**    | Yes (Necessary tools exist)    | No (Required tools are unavailable)   |
+| **What is the cost of error?**           | Low (Errors are cheap/reversible) | High (Errors are costly/irreversible) |
 
 Ultimately, there is no magic solution for messy data. The path to a high-performing AI system requires confronting the complexities of your data architecture. By applying these principles, you can build a solid foundation for your AI, ensuring more accurate, cost-effective, and truly transformative results.""",
     "Title": "TEST Chunking 101: The Invisible Bottleneck Killing Enterprise AI Projects",
