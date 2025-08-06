@@ -42,6 +42,9 @@ Thumbs.db
 # Chat logs
 chat_logs/
 
+# Hypothesis
+.hypothesis/
+
 # Batch files (example)
 batch.txt
 *.batch
