@@ -441,3 +441,46 @@ class TestNotionStorage:
         
         # Should find the second database with proper title
         assert result == "db_456"
+
+    @patch('src.youtube_notion.storage.notion_storage.Client')
+    @patch('src.youtube_notion.storage.notion_storage.enrich_timestamps_with_links')
+    @patch('src.youtube_notion.storage.notion_storage.markdown_to_notion_blocks')
+    def test_store_video_summary_with_batching(self, mock_markdown_blocks, mock_enrich_timestamps, mock_client_class):
+        """Test that summaries with more than 100 blocks are batched correctly."""
+        # Setup mocks
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        mock_enrich_timestamps.return_value = "enriched summary"
+        # Create 150 mock blocks
+        mock_blocks = [{"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": f"Block {i}"}}]}} for i in range(150)]
+        mock_markdown_blocks.return_value = mock_blocks
+
+        mock_client.pages.create.return_value = {"id": "page_123"}
+
+        # Mock find_target_location
+        self.storage._database_id = "db_123"
+
+        # Execute
+        result = self.storage.store_video_summary(self.sample_video_data)
+
+        # Verify
+        assert result is True
+
+        # Verify page creation with the first 100 blocks
+        mock_client.pages.create.assert_called_once()
+        create_call_args = mock_client.pages.create.call_args
+
+        # The first batch includes the embed and divider blocks, so it's 2 + 98 = 100
+        assert len(create_call_args[1]['children']) == 100
+
+        # Verify that blocks.children.append was called for the remaining blocks
+        mock_client.blocks.children.append.assert_called_once()
+        append_call_args = mock_client.blocks.children.append.call_args
+
+        # Check that the call was for the correct page
+        assert append_call_args[1]['block_id'] == "page_123"
+
+        # Check that the remaining 52 blocks were appended (2 initial blocks + 150 summary blocks = 152 total)
+        # 100 in first batch, 52 in second
+        assert len(append_call_args[1]['children']) == 52

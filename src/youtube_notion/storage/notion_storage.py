@@ -354,15 +354,31 @@ class NotionStorage(Storage):
                 }
             }
             
-            # Create the page with YouTube embed and summary blocks as content
+            # Notion API has a limit of 100 blocks per request.
+            # Create the page with the first batch of blocks.
+            BLOCK_SIZE = 100
+            first_batch = all_blocks[:BLOCK_SIZE]
+
             page = self._api_call_with_retry(
                 self.client.pages.create,
                 parent={"database_id": database_id},
                 properties=properties,
-                children=all_blocks,
+                children=first_batch,
                 cover={"type": "external", "external": {"url": cover_url}} if cover_url else None
             )
             
+            # Append remaining blocks in batches
+            remaining_blocks = all_blocks[BLOCK_SIZE:]
+            page_id = page['id']
+
+            for i in range(0, len(remaining_blocks), BLOCK_SIZE):
+                batch = remaining_blocks[i:i + BLOCK_SIZE]
+                self._api_call_with_retry(
+                    self.client.blocks.children.append,
+                    block_id=page_id,
+                    children=batch
+                )
+
             return True
             
         except Exception as e:
