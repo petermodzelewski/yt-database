@@ -4,130 +4,90 @@ inclusion: always
 
 # Technical Guidelines
 
-## Technology Stack & Dependencies
+## Core Stack & Dependencies
 
-**Core Stack**: Python 3.12+, Notion SDK, Google Gemini AI, YouTube Data API
-**Key Dependencies**: `notion-client`, `google-genai>=0.1.0`, `python-dotenv`, `pytest`
+**Python 3.12+** with `notion-client`, `google-genai>=0.1.0`, `python-dotenv`, `pytest`
 
-## Development Patterns
+## Architecture Rules
 
-### Package Structure
-- Use relative imports within `src/youtube_notion/` package
-- Follow modern Python packaging with `pyproject.toml`
-- Maintain clear module separation with component-based architecture:
-  - `interfaces/`: Abstract base classes for components
-  - `extractors/`: Video metadata extraction logic
-  - `writers/`: Summary generation implementations
-  - `storage/`: Data persistence backends
-  - `processors/`: Orchestration and workflow coordination
-  - `config/`: Configuration, factory, and example data
-  - `utils/`: Shared utilities and exception classes
+### Component-Based Design
+- **ALWAYS** use `ComponentFactory` for dependency injection - never instantiate components directly
+- **ALWAYS** use relative imports within `src/youtube_notion/` package
+- All components implement abstract interfaces from `interfaces/` for testability
+- Package structure: `interfaces/`, `extractors/`, `writers/`, `storage/`, `processors/`, `config/`, `utils/`
 
-### Testing Requirements
-- **Always use**: `python run_tests.py` (handles PYTHONPATH automatically)
-- **Avoid**: Direct `pytest` calls without proper path setup
-- Install in development mode: `pip install -e .` before testing
-- **Test Structure**: Separate unit tests (`tests/unit/`) from integration tests (`tests/integration/`)
-- **Unit Tests**: Fast, isolated tests using mock implementations from `tests/fixtures/mock_implementations.py`
-- **Integration Tests**: Use `.env-test` configuration and test database "YT Summaries [TEST]"
-
-### Test-Driven Development Standards
-- **PRIMARY FOCUS**: Unit tests for regular development work (478 tests run in ~6 seconds)
-- **MANDATORY**: Write proper unit tests for every functionality change
-- **NEVER**: Use print statements or quick checks for validation
-- **DAILY WORKFLOW**: Run unit tests frequently during development (`python run_tests.py`)
-- **INTEGRATION TESTS**: Run only at end of development cycle or before releases (slow, ~90 seconds)
-- **REQUIRED**: Review and update existing tests when functionality changes
-- **PREFER**: Unit tests over integration tests (faster execution, no external dependencies)
-- **STRUCTURE**: Follow existing test patterns in `tests/` directory
-- **COVERAGE**: Ensure new code paths are covered by unit tests
-- **VALIDATION**: Unit tests must pass before considering changes complete
-- **MOCK USAGE**: Use comprehensive mock implementations from `tests/fixtures/mock_implementations.py`
-
-### Error Handling Standards
-- Return boolean success indicators from main functions
-- Use structured exception hierarchy from `utils/exceptions.py`:
-  - `VideoProcessingError`: Base exception for video processing failures
-  - `ConfigurationError`: Configuration validation failures
-  - `MetadataExtractionError`: Video metadata extraction failures
-  - `SummaryGenerationError`: AI summary generation failures
-  - `StorageError`: Data persistence failures
-- Provide user-friendly error messages with troubleshooting context
-- Implement graceful fallbacks (YouTube API → web scraping)
-- **Intelligent Quota Management**: Parse `retryDelay` from API responses and wait appropriately
-- **Test Mode Detection**: Cap retry delays to 5 seconds during testing to prevent hangs
-- **Batch Resilience**: Continue processing other URLs even when some hit quota limits
-
-### Configuration Management
-- Use `.env` files with `python-dotenv` for environment variables
-- Use `.env-test` for integration test configuration
-- Validate configuration based on operation mode (YouTube vs example data)
-- Support multiple API providers with graceful degradation
-- **Component Factory**: Use `config/factory.py` for dependency injection and component creation
-- **Interface-Based Design**: All components implement abstract interfaces for testability and extensibility
-
-## Code Style Rules
-
-### Import Conventions
+### Import Pattern (Required)
 ```python
-# Internal package imports (relative)
+# Relative imports within package
 from .interfaces.storage import Storage
-from .interfaces.summary_writer import SummaryWriter
-from .storage.notion_storage import NotionStorage
-from .writers.gemini_summary_writer import GeminiSummaryWriter
-from .extractors.video_metadata_extractor import VideoMetadataExtractor
-from .processors.video_processor import VideoProcessor
 from .config.factory import ComponentFactory
-from .config.example_data import EXAMPLE_DATA
-from .utils.exceptions import VideoProcessingError, ConfigurationError
+from .utils.exceptions import VideoProcessingError
 
-# External dependencies (absolute)
+# Absolute imports for external dependencies
 from notion_client import Client
 ```
 
-### CLI Design Patterns
-- Support dual entry points: `youtube_notion_cli.py` (dev) and console script (installed)
-- Use mutually exclusive argument groups for different modes
-- Provide comprehensive help documentation with examples
-- Support batch processing with `--batch` flag and multiple URL inputs
-- Implement file-based URL input for large batch operations
-- Use `batch_mode` parameter to control output verbosity
+## Testing Standards
 
-### API Integration Standards
-- Implement retry logic for external API calls
-- Use structured error handling with specific exception types
-- Support fallback mechanisms (API → web scraping)
-- Validate API responses before processing
-- Implement rate limiting for batch operations to respect API quotas
-- Use connection pooling and session reuse for batch processing efficiency
-- **Enhanced Quota Handling**: Parse `retryDelay` from API error responses (e.g., "18s")
-- **Smart Retry Logic**: Wait for API-specified delay + 15 second buffer before retrying
-- **Batch Processing Resilience**: Continue processing remaining URLs when individual ones hit quota limits
-- **Test Environment Optimization**: Cap retry delays to 5 seconds maximum during testing
+### Primary Development Workflow
+- **MANDATORY**: Run `python run_tests.py` for all development (478 tests, ~6s)
+- **NEVER**: Use direct `pytest` calls or print statements for validation
+- **REQUIRED**: Write unit tests for every functionality change
+- **REQUIRED**: Use mock implementations from `tests/fixtures/mock_implementations.py`
+
+### Test Types
+- **Unit Tests** (`tests/unit/`): Fast, isolated, no external APIs
+- **Integration Tests** (`tests/integration/`): End-to-end with `.env-test` config
+- Run integration tests only before releases (13 tests, ~90s)
+
+## Error Handling
+
+### Exception Hierarchy (from `utils/exceptions.py`)
+- `VideoProcessingError` - Base for video processing failures
+- `ConfigurationError` - Configuration validation failures
+- `MetadataExtractionError` - Video metadata extraction failures
+- `SummaryGenerationError` - AI summary generation failures
+- `StorageError` - Data persistence failures
+
+### Error Patterns
+- Return boolean success indicators from main functions
+- Parse `retryDelay` from API responses and wait appropriately
+- Cap retry delays to 5 seconds during testing
+- Continue batch processing when individual URLs fail
+
+## API Integration
+
+### Retry Logic
+- Implement graceful fallbacks (YouTube API → web scraping)
+- Parse API `retryDelay` responses (e.g., "18s") + 15 second buffer
+- Use connection pooling for batch operations
+- Validate all API responses before processing
+
+### Configuration
+- Use `.env` for development, `.env-test` for integration tests
+- Validate configuration at component initialization
+- Support multiple API providers with graceful degradation
 
 ## Development Commands
 
 ```bash
-# Setup (required)
+# Setup
 pip install -e .
 cp .env.example .env
 
-# Testing (primary development workflow)
-python run_tests.py                    # Unit tests only (fast, ~6 seconds)
-python -m pytest tests/integration/   # Integration tests (slow, ~90 seconds, run at end)
+# Primary workflow
+python run_tests.py                    # Unit tests (daily use)
+python -m pytest tests/integration/   # Integration tests (releases only)
 
-# Running application
-python youtube_notion_cli.py --example-data  # Default mode
-python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # YouTube mode
-python youtube_notion_cli.py --batch --urls url1 url2 url3  # Batch mode
-python youtube_notion_cli.py --batch --file urls.txt  # Batch from file
+# Application modes
+python youtube_notion_cli.py --example-data           # Default mode
+python youtube_notion_cli.py --url "VIDEO_URL"        # YouTube mode
+python youtube_notion_cli.py --batch --urls url1 url2 # Batch mode
 ```
 
-## Current Architecture Status
+## CLI Design
 
-The project has been successfully restructured with a component-based architecture:
-
-- **✅ Complete**: All 6 architecture requirements implemented
-- **✅ Tested**: 478 unit tests + 13 integration tests, all passing
-- **✅ Operational**: Full backward compatibility maintained
-- **✅ Quality**: Comprehensive error handling and mock implementations
+- Dual entry points: `youtube_notion_cli.py` (dev) and console script (installed)
+- Mutually exclusive argument groups for different modes
+- File-based URL input for large batch operations (`--file urls.txt`)
+- Use `batch_mode` parameter to control output verbosity
