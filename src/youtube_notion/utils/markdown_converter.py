@@ -14,11 +14,20 @@ def parse_rich_text(text):
     - Links: [text](url)
     - Bold: **text** (can contain links)
     - Italic: *text* (can contain links)
+    - Strikethrough: ~~text~~ (can contain links)
+    - Inline code: `code`
     """
     rich_text = []
     i = 0
     
     while i < len(text):
+        # The order of matching is important:
+        # 1. Links: [text](url) - Can contain other formatting.
+        # 2. Strikethrough: ~~text~~
+        # 3. Bold: **text**
+        # 4. Italic: *text*
+        # 5. Inline code: `code`
+
         # Look for markdown link pattern [text](url)
         link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', text[i:])
         if link_match:
@@ -40,6 +49,13 @@ def parse_rich_text(text):
                     "text": {"content": link_text[1:-1], "link": {"url": link_url}},
                     "annotations": {"italic": True}
                 })
+            elif '~~' in link_text and link_text.startswith('~~') and link_text.endswith('~~'):
+                # Strikethrough link
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": link_text[2:-2], "link": {"url": link_url}},
+                    "annotations": {"strikethrough": True}
+                })
             else:
                 # Regular link
                 rich_text.append({
@@ -50,6 +66,32 @@ def parse_rich_text(text):
             i += link_match.end()
             continue
         
+        # Look for strikethrough text ~~text~~ (may contain links)
+        strikethrough_match = re.match(r'~~([^~]+)~~', text[i:])
+        if strikethrough_match:
+            strikethrough_content = strikethrough_match.group(1)
+
+            # Check if strikethrough content contains links
+            if '[' in strikethrough_content and '](' in strikethrough_content:
+                # Parse the content recursively for links
+                strikethrough_rich_text = parse_rich_text(strikethrough_content)
+                # Apply strikethrough formatting to all parts
+                for part in strikethrough_rich_text:
+                    if 'annotations' not in part:
+                        part['annotations'] = {}
+                    part['annotations']['strikethrough'] = True
+                    rich_text.append(part)
+            else:
+                # Simple strikethrough text
+                rich_text.append({
+                    "type": "text",
+                    "text": {"content": strikethrough_content},
+                    "annotations": {"strikethrough": True}
+                })
+
+            i += strikethrough_match.end()
+            continue
+
         # Look for bold text **text** (may contain links)
         bold_match = re.match(r'\*\*([^*]+)\*\*', text[i:])
         if bold_match:
@@ -102,9 +144,21 @@ def parse_rich_text(text):
             i += italic_match.end()
             continue
         
+        # Look for inline code `code` (no links inside)
+        code_match = re.match(r'`([^`]+)`', text[i:])
+        if code_match:
+            code_content = code_match.group(1)
+            rich_text.append({
+                "type": "text",
+                "text": {"content": code_content},
+                "annotations": {"code": True}
+            })
+            i += code_match.end()
+            continue
+
         # Regular character - find the next special character or end of string
         next_special = len(text)
-        for pattern in [r'\[', r'\*\*', r'\*']:
+        for pattern in [r'\[', r'~~', r'\*\*', r'\*', r'`']:
             match = re.search(pattern, text[i:])
             if match:
                 next_special = min(next_special, i + match.start())
@@ -136,82 +190,187 @@ def markdown_to_notion_blocks(markdown_text):
     i = 0
     
     while i < len(lines):
-        line = lines[i].strip()
+        line = lines[i] # Keep leading whitespace for code blocks
         
-        if not line:
+        stripped_line = line.strip()
+
+        if not stripped_line:
             i += 1
             continue
+
+        # Handle code blocks
+        if stripped_line.startswith('```'):
+            # Find the end of the code block
+            end_index = -1
+            for j in range(i + 1, len(lines)):
+                if lines[j].strip() == '```':
+                    end_index = j
+                    break
             
+            if end_index != -1:
+                # Extract code content
+                code_content = '\n'.join(lines[i+1:end_index])
+                # Extract language from the starting fence
+                language = stripped_line[3:].strip() or "plain text"
+
+                blocks.append({
+                    "object": "block",
+                    "type": "code",
+                    "code": {
+                        "caption": [],
+                        "language": language,
+                        "rich_text": [{
+                            "type": "text",
+                            "text": {
+                                "content": code_content
+                            }
+                        }]
+                    }
+                })
+                i = end_index + 1
+                continue
+
         # Handle headers (Notion supports only H1, H2, H3)
-        if line.startswith('#'):
+        if stripped_line.startswith('#'):
             # Count the number of # symbols
             header_level = 0
-            for char in line:
+            for char in stripped_line:
                 if char == '#':
                     header_level += 1
                 else:
                     break
             
-            header_text = line[header_level:].strip()
+            header_text = stripped_line[header_level:].strip()
             
             if header_level == 1:
                 blocks.append({
                     "object": "block",
                     "type": "heading_1",
-                    "heading_1": {
-                        "rich_text": parse_rich_text(header_text)
-                    }
+                    "heading_1": { "rich_text": parse_rich_text(header_text) }
                 })
             elif header_level == 2:
                 blocks.append({
                     "object": "block",
                     "type": "heading_2", 
-                    "heading_2": {
-                        "rich_text": parse_rich_text(header_text)
-                    }
+                    "heading_2": { "rich_text": parse_rich_text(header_text) }
                 })
             elif header_level >= 3:
                 # H3 and beyond all become H3 in Notion
                 blocks.append({
                     "object": "block",
                     "type": "heading_3",
-                    "heading_3": {
-                        "rich_text": parse_rich_text(header_text)
-                    }
+                    "heading_3": { "rich_text": parse_rich_text(header_text) }
                 })
+        # Handle blockquotes
+        elif stripped_line.startswith('> '):
+            quote_text = stripped_line[2:]
+            blocks.append({
+                "object": "block",
+                "type": "quote",
+                "quote": {
+                    "rich_text": parse_rich_text(quote_text)
+                }
+            })
         # Handle bullet points
-        elif line.startswith('*   ') or line.startswith('- '):
-            bullet_text = line[4:] if line.startswith('*   ') else line[2:]
+        elif stripped_line.startswith('* ') or stripped_line.startswith('- ') or stripped_line.startswith('*   '):
+            if stripped_line.startswith('*   '):
+                bullet_text = stripped_line[4:]
+            else:
+                bullet_text = stripped_line[2:]
             blocks.append({
                 "object": "block",
                 "type": "bulleted_list_item",
-                "bulleted_list_item": {
-                    "rich_text": parse_rich_text(bullet_text)
-                }
+                "bulleted_list_item": { "rich_text": parse_rich_text(bullet_text) }
             })
         # Handle numbered lists
-        elif re.match(r'^\d+\.', line):
-            numbered_text = re.sub(r'^\d+\.\s*', '', line)
+        elif re.match(r'^\d+\.', stripped_line):
+            numbered_text = re.sub(r'^\d+\.\s*', '', stripped_line)
             blocks.append({
                 "object": "block",
                 "type": "numbered_list_item", 
-                "numbered_list_item": {
-                    "rich_text": parse_rich_text(numbered_text)
-                }
+                "numbered_list_item": { "rich_text": parse_rich_text(numbered_text) }
             })
+        # Handle tables
+        elif stripped_line.startswith('|') and i + 1 < len(lines) and re.match(r'[|:\-\s]+', lines[i+1].strip()):
+            table_lines = [stripped_line]
+            j = i + 1
+            while j < len(lines) and lines[j].strip().startswith('|'):
+                table_lines.append(lines[j].strip())
+                j += 1
+
+            table_block = _parse_table_block(table_lines)
+            if table_block:
+                blocks.append(table_block)
+
+            i = j
+            continue
+
         # Handle regular paragraphs
         else:
             blocks.append({
                 "object": "block",
                 "type": "paragraph",
                 "paragraph": {
-                    "rich_text": parse_rich_text(line)
+                    "rich_text": parse_rich_text(stripped_line)
                 }
             })
         
         i += 1
     
     return blocks
+
+
+def _parse_table_block(table_lines):
+    """Parse a list of markdown table lines into a Notion table block."""
+    header_line = table_lines[0]
+    separator_line = table_lines[1]
+    row_lines = table_lines[2:]
+
+    # Extract header cells
+    header_cells = [cell.strip() for cell in header_line.split('|') if cell.strip()]
+    num_columns = len(header_cells)
+
+    # Validate separator line
+    separator_cells = [cell.strip() for cell in separator_line.split('|') if cell.strip()]
+    if len(separator_cells) != num_columns or not all(re.match(r':?--+:?', cell) for cell in separator_cells):
+        return None
+
+    # Create table block
+    table_block = {
+        "object": "block",
+        "type": "table",
+        "table": {
+            "table_width": num_columns,
+            "has_column_header": True,
+            "has_row_header": False,
+            "children": []
+        }
+    }
+
+    # Add header row
+    header_row = {
+        "type": "table_row",
+        "table_row": {
+            "cells": [parse_rich_text(cell) for cell in header_cells]
+        }
+    }
+    table_block["table"]["children"].append(header_row)
+
+    # Add data rows
+    for row_line in row_lines:
+        row_cells = [cell.strip() for cell in row_line.split('|') if cell.strip()]
+        if len(row_cells) != num_columns:
+            continue
+
+        row = {
+            "type": "table_row",
+            "table_row": {
+                "cells": [parse_rich_text(cell) for cell in row_cells]
+            }
+        }
+        table_block["table"]["children"].append(row)
+
+    return table_block
 
 
 def parse_timestamp_to_seconds(timestamp):
