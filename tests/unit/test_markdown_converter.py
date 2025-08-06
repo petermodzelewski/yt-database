@@ -235,6 +235,55 @@ class TestParseRichText(unittest.TestCase):
         ]
         self.assertEqual(result, expected)
 
+    def test_table(self):
+        """Test parsing a markdown table."""
+        markdown = """| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |"""
+        result = markdown_to_notion_blocks(markdown)
+        expected = [
+            {
+                "object": "block",
+                "type": "table",
+                "table": {
+                    "table_width": 2,
+                    "has_column_header": True,
+                    "has_row_header": False,
+                    "children": [
+                        {
+                            "type": "table_row",
+                            "table_row": {
+                                "cells": [
+                                    [{"type": "text", "text": {"content": "Header 1"}}],
+                                    [{"type": "text", "text": {"content": "Header 2"}}]
+                                ]
+                            }
+                        },
+                        {
+                            "type": "table_row",
+                            "table_row": {
+                                "cells": [
+                                    [{"type": "text", "text": {"content": "Cell 1"}}],
+                                    [{"type": "text", "text": {"content": "Cell 2"}}]
+                                ]
+                            }
+                        },
+                        {
+                            "type": "table_row",
+                            "table_row": {
+                                "cells": [
+                                    [{"type": "text", "text": {"content": "Cell 3"}}],
+                                    [{"type": "text", "text": {"content": "Cell 4"}}]
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+        self.assertEqual(result, expected)
+
 
 class TestMarkdownToNotionBlocks(unittest.TestCase):
     """Test cases for markdown_to_notion_blocks function."""
@@ -529,6 +578,49 @@ This is a paragraph."""
         self.assertEqual(rich_text[1]["text"]["content"], "link")
         self.assertEqual(rich_text[1]["annotations"]["bold"], True)
         self.assertEqual(rich_text[1]["text"]["link"]["url"], "https://example.com")
+
+    def test_table_with_formatted_cells(self):
+        """Test parsing a markdown table with formatted cells."""
+        markdown = """| *Header 1* | **Header 2** |
+|------------|--------------|
+| `Cell 1`   | [Cell 2](https://example.com) |
+| ~~Cell 3~~ | `Cell 4`     |"""
+        result = markdown_to_notion_blocks(markdown)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['type'], 'table')
+        table = result[0]['table']
+        self.assertEqual(table['table_width'], 2)
+        self.assertEqual(table['has_column_header'], True)
+        self.assertEqual(len(table['children']), 3)
+
+        # header
+        header_row = table['children'][0]
+        self.assertEqual(header_row['table_row']['cells'][0][0]['annotations']['italic'], True)
+        self.assertEqual(header_row['table_row']['cells'][1][0]['annotations']['bold'], True)
+
+        # row 1
+        row1 = table['children'][1]
+        self.assertEqual(row1['table_row']['cells'][0][0]['annotations']['code'], True)
+        self.assertIn('link', row1['table_row']['cells'][1][0]['text'])
+
+        # row 2
+        row2 = table['children'][2]
+        self.assertEqual(row2['table_row']['cells'][0][0]['annotations']['strikethrough'], True)
+        self.assertEqual(row2['table_row']['cells'][1][0]['annotations']['code'], True)
+
+    def test_no_formatting_in_code_blocks(self):
+        """Test that markdown formatting is not processed inside code blocks."""
+        markdown = """```
+**This should not be bold**
+*This should not be italic*
+[This should not be a link](https://example.com)
+```"""
+        result = markdown_to_notion_blocks(markdown)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['type'], 'code')
+        rich_text = result[0]['code']['rich_text']
+        self.assertEqual(len(rich_text), 1)
+        self.assertEqual(rich_text[0]['text']['content'], '**This should not be bold**\n*This should not be italic*\n[This should not be a link](https://example.com)')
 
 
 if __name__ == '__main__':
