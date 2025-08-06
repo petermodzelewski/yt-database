@@ -7,12 +7,11 @@ and error reporting functionality.
 
 import os
 import pytest
-from unittest.mock import patch, mock_open
-from youtube_notion.config import (
+from unittest.mock import patch, mock_open, Mock
+from src.youtube_notion.config import (
     ApplicationConfig,
     NotionConfig,
     YouTubeProcessorConfig,
-    ConfigurationError,
     DEFAULT_SUMMARY_PROMPT,
     validate_environment_variables,
     get_configuration_help,
@@ -20,6 +19,8 @@ from youtube_notion.config import (
     load_custom_prompt,
     ComponentFactory
 )
+from src.youtube_notion.config.settings import ConfigurationError as SettingsConfigurationError
+from src.youtube_notion.utils.exceptions import ConfigurationError
 
 
 class TestYouTubeProcessorConfig:
@@ -305,7 +306,7 @@ class TestApplicationConfig:
     def test_from_environment_missing_vars(self):
         """Test that missing environment variables raise ConfigurationError."""
         with patch.dict(os.environ, {}, clear=True):
-            with patch('youtube_notion.config.settings.load_dotenv'):  # Prevent .env loading
+            with patch('src.youtube_notion.config.settings.load_dotenv'):  # Prevent .env loading
                 with pytest.raises(ConfigurationError):
                     ApplicationConfig.from_environment(youtube_mode=False)
 
@@ -448,7 +449,7 @@ class TestComponentFactory:
         factory = ComponentFactory(app_config)
         
         # Mock the validation to avoid actual API calls
-        with patch('youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', return_value=True):
+        with patch('src.youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', return_value=True):
             summary_writer = factory.create_summary_writer()
             
             assert summary_writer is not None
@@ -470,7 +471,7 @@ class TestComponentFactory:
     
     def test_create_summary_writer_with_custom_chat_logger(self):
         """Test summary writer creation with custom chat logger."""
-        from youtube_notion.utils.chat_logger import ChatLogger
+        from src.youtube_notion.utils.chat_logger import ChatLogger
         
         notion_config = NotionConfig(notion_token="test_token")
         youtube_config = YouTubeProcessorConfig(gemini_api_key="test_gemini_key")
@@ -479,7 +480,7 @@ class TestComponentFactory:
         
         custom_logger = ChatLogger()
         
-        with patch('youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', return_value=True):
+        with patch('src.youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', return_value=True):
             summary_writer = factory.create_summary_writer(chat_logger=custom_logger)
             
             assert summary_writer.chat_logger == custom_logger
@@ -491,7 +492,7 @@ class TestComponentFactory:
         app_config = ApplicationConfig(notion=notion_config, youtube_processor=youtube_config)
         factory = ComponentFactory(app_config)
         
-        with patch('youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', 
+        with patch('src.youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', 
                    side_effect=ConfigurationError("Invalid API key")):
             with pytest.raises(ConfigurationError, match="Invalid API key"):
                 factory.create_summary_writer()
@@ -506,8 +507,16 @@ class TestComponentFactory:
         app_config = ApplicationConfig(notion=notion_config)
         factory = ComponentFactory(app_config)
         
-        # Mock the validation to avoid actual API calls
-        with patch('youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', return_value=True):
+        # Mock the Notion API client to avoid actual API calls
+        with patch('src.youtube_notion.storage.notion_storage.Client') as mock_client_class:
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+            
+            # Mock the search API call that validate_configuration makes
+            mock_client.search.return_value = {
+                'results': [{'id': 'test-db-id', 'title': [{'plain_text': 'Test DB'}]}]
+            }
+            
             storage = factory.create_storage()
             
             assert storage is not None
@@ -521,7 +530,7 @@ class TestComponentFactory:
         app_config = ApplicationConfig(notion=notion_config)
         factory = ComponentFactory(app_config)
         
-        with patch('youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', 
+        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', 
                    side_effect=ConfigurationError("Invalid token")):
             with pytest.raises(ConfigurationError, match="Invalid token"):
                 factory.create_storage()
@@ -562,18 +571,25 @@ class TestComponentFactory:
         app_config = ApplicationConfig(notion=notion_config, youtube_processor=youtube_config)
         factory = ComponentFactory(app_config)
         
-        # Mock validations to avoid actual API calls
-        with patch('youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', return_value=True):
-            with patch('youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', return_value=True):
-                extractor, writer, storage = factory.create_all_components()
-                
-                assert extractor is not None
-                assert writer is not None
-                assert storage is not None
+        # Mock the Notion API client to avoid actual API calls
+        with patch('src.youtube_notion.storage.notion_storage.Client') as mock_client_class:
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+            
+            # Mock the search API call that validate_configuration makes
+            mock_client.search.return_value = {
+                'results': [{'id': 'test-db-id', 'title': [{'plain_text': 'Test DB'}]}]
+            }
+            
+            extractor, writer, storage = factory.create_all_components()
+            
+            assert extractor is not None
+            assert writer is not None
+            assert storage is not None
     
     def test_create_all_components_with_custom_logger(self):
         """Test creation of all components with custom chat logger."""
-        from youtube_notion.utils.chat_logger import ChatLogger
+        from src.youtube_notion.utils.chat_logger import ChatLogger
         
         notion_config = NotionConfig(notion_token="test_token")
         youtube_config = YouTubeProcessorConfig(gemini_api_key="test_gemini_key")
@@ -582,11 +598,19 @@ class TestComponentFactory:
         
         custom_logger = ChatLogger()
         
-        with patch('youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.validate_configuration', return_value=True):
-            with patch('youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', return_value=True):
-                extractor, writer, storage = factory.create_all_components(chat_logger=custom_logger)
-                
-                assert writer.chat_logger == custom_logger
+        # Mock the Notion API client to avoid actual API calls
+        with patch('src.youtube_notion.storage.notion_storage.Client') as mock_client_class:
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+            
+            # Mock the search API call that validate_configuration makes
+            mock_client.search.return_value = {
+                'results': [{'id': 'test-db-id', 'title': [{'plain_text': 'Test DB'}]}]
+            }
+            
+            extractor, writer, storage = factory.create_all_components(chat_logger=custom_logger)
+            
+            assert writer.chat_logger == custom_logger
     
     def test_validate_all_configurations_success(self):
         """Test successful validation of all configurations."""
@@ -602,35 +626,26 @@ class TestComponentFactory:
     def test_validate_all_configurations_invalid_summary_writer(self):
         """Test validation failure for summary writer configuration."""
         notion_config = NotionConfig(notion_token="test_token")
-        youtube_config = YouTubeProcessorConfig(
-            gemini_api_key="",  # Invalid empty key
-        )
-        app_config = ApplicationConfig(notion=notion_config, youtube_processor=youtube_config)
         
-        with pytest.raises(ConfigurationError, match="Gemini API key is required"):
-            ComponentFactory(app_config)
+        # The YouTubeProcessorConfig constructor validates the API key
+        with pytest.raises(ValueError, match="Gemini API key is required"):
+            youtube_config = YouTubeProcessorConfig(
+                gemini_api_key="",  # Invalid empty key
+            )
     
     def test_validate_all_configurations_invalid_storage(self):
         """Test validation failure for storage configuration."""
-        notion_config = NotionConfig(
-            notion_token="",  # Invalid empty token
-        )
-        
+        # The NotionConfig constructor validates the token
         with pytest.raises(ValueError, match="Notion token is required"):
             NotionConfig(notion_token="")
     
     def test_validate_all_configurations_invalid_temperature(self):
         """Test validation failure for invalid temperature."""
-        notion_config = NotionConfig(notion_token="test_token")
-        youtube_config = YouTubeProcessorConfig(
-            gemini_api_key="test_key",
-            gemini_temperature=3.0  # Invalid temperature > 2
-        )
-        
+        # The YouTubeProcessorConfig constructor validates the temperature
         with pytest.raises(ValueError, match="gemini_temperature must be between 0 and 2"):
             YouTubeProcessorConfig(
                 gemini_api_key="test_key",
-                gemini_temperature=3.0
+                gemini_temperature=3.0  # Invalid temperature > 2
             )
     
     def test_from_environment_success(self):
@@ -642,7 +657,7 @@ class TestComponentFactory:
         }
         
         with patch.dict(os.environ, env_vars, clear=True):
-            with patch('youtube_notion.config.settings.load_dotenv'):
+            with patch('src.youtube_notion.config.settings.load_dotenv'):
                 factory = ComponentFactory.from_environment(youtube_mode=True)
                 
                 assert factory.config.notion.notion_token == "test_token"
@@ -652,7 +667,7 @@ class TestComponentFactory:
     def test_from_environment_missing_vars(self):
         """Test factory creation from environment with missing variables."""
         with patch.dict(os.environ, {}, clear=True):
-            with patch('youtube_notion.config.settings.load_dotenv'):
+            with patch('src.youtube_notion.config.settings.load_dotenv'):
                 with pytest.raises(ConfigurationError):
                     ComponentFactory.from_environment(youtube_mode=True)
     
@@ -743,15 +758,12 @@ class TestComponentFactory:
     def test_factory_validation_invalid_gemini_config(self):
         """Test factory validation with invalid Gemini configuration."""
         notion_config = NotionConfig(notion_token="test_token")
-        youtube_config = YouTubeProcessorConfig(
-            gemini_api_key="test_key",
-            gemini_temperature=-1.0  # Invalid temperature
-        )
         
+        # Test that invalid temperature raises ValueError during config creation
         with pytest.raises(ValueError, match="gemini_temperature must be between 0 and 2"):
             YouTubeProcessorConfig(
                 gemini_api_key="test_key",
-                gemini_temperature=-1.0
+                gemini_temperature=-1.0  # Invalid temperature
             )
     
     def test_component_creation_error_handling(self):
@@ -762,19 +774,19 @@ class TestComponentFactory:
         factory = ComponentFactory(app_config)
         
         # Test summary writer creation error
-        with patch('youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.__init__', 
+        with patch('src.youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.__init__', 
                    side_effect=Exception("Unexpected error")):
             with pytest.raises(ConfigurationError, match="Failed to create summary writer"):
                 factory.create_summary_writer()
         
         # Test storage creation error
-        with patch('youtube_notion.storage.notion_storage.NotionStorage.__init__', 
+        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.__init__', 
                    side_effect=Exception("Unexpected error")):
             with pytest.raises(ConfigurationError, match="Failed to create storage backend"):
                 factory.create_storage()
         
         # Test metadata extractor creation error
-        with patch('youtube_notion.extractors.video_metadata_extractor.VideoMetadataExtractor.__init__', 
+        with patch('src.youtube_notion.extractors.video_metadata_extractor.VideoMetadataExtractor.__init__', 
                    side_effect=Exception("Unexpected error")):
             with pytest.raises(ConfigurationError, match="Failed to create metadata extractor"):
                 factory.create_metadata_extractor()

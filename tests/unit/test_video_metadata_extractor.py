@@ -251,11 +251,24 @@ class TestVideoMetadataExtractor:
         http_error.error_details = [{'message': 'Invalid API key'}]
         mock_request.execute.side_effect = http_error
         
-        with pytest.raises(APIError) as exc_info:
-            self.extractor_with_api.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        
-        assert "YouTube API authentication failed" in str(exc_info.value)
-        assert exc_info.value.status_code == 401
+        # Mock web scraping fallback to succeed
+        with patch('requests.get') as mock_get:
+            mock_scraping_response = Mock()
+            mock_scraping_response.text = '''
+            <html>
+            <script>
+            var ytInitialData = {"contents":{"videoDetails":{"title":"Test Video","author":"Test Channel"}}};
+            </script>
+            </html>
+            '''
+            mock_get.return_value = mock_scraping_response
+            
+            # Should fall back to web scraping instead of raising error
+            result = self.extractor_with_api.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            
+            # Verify that web scraping was used as fallback
+            assert result is not None
+            assert 'title' in result
     
     @patch('requests.get')
     def test_extract_metadata_via_scraping_success(self, mock_get):

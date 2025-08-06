@@ -10,15 +10,10 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
+from ..utils.exceptions import ConfigurationError
 
-# Default prompt for Gemini API summary generation
-DEFAULT_SUMMARY_PROMPT = """
-Condense all the practical information and examples regarding the video content in form of an article. 
-Don't miss any details but keep the article as short and direct as possible. 
-Put timestamp(s) to fragments of the video next to each fact you got from the video.
-Format the output in markdown with proper headers, bullet points, and formatting.
-Use timestamps in the format [MM:SS] or [MM:SS-MM:SS] for time ranges.
-"""
+
+from .constants import DEFAULT_SUMMARY_PROMPT
 
 
 @dataclass
@@ -142,14 +137,7 @@ class ApplicationConfig:
         )
 
 
-class ConfigurationError(Exception):
-    """Raised when configuration validation fails."""
-    
-    def __init__(self, message: str, missing_vars: Optional[List[str]] = None, 
-                 invalid_vars: Optional[Dict[str, str]] = None):
-        super().__init__(message)
-        self.missing_vars = missing_vars or []
-        self.invalid_vars = invalid_vars or {}
+
 
 
 def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]:

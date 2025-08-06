@@ -22,7 +22,7 @@ from ..utils.exceptions import (
     APIError,
     QuotaExceededError
 )
-from ..config.settings import DEFAULT_SUMMARY_PROMPT
+from ..config.constants import DEFAULT_SUMMARY_PROMPT
 
 
 class GeminiSummaryWriter(SummaryWriter):
@@ -479,8 +479,7 @@ class GeminiSummaryWriter(SummaryWriter):
         """
         if isinstance(error, QuotaExceededError):
             # Enhance quota error with helpful information (check this first since it inherits from APIError)
-            # Enhance quota error with helpful information
-            enhanced_message = f"{error.message} (Quota limit reached)"
+            enhanced_message = f"{error.message} (Failed after {retry_count}/{max_retries} attempts)"
             
             if error.quota_type:
                 enhanced_message += f" - Quota type: {error.quota_type}"

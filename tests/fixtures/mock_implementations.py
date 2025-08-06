@@ -163,7 +163,8 @@ class MockStorage(Storage):
     def __init__(self, should_fail: bool = False, 
                  fail_on_titles: Optional[List[str]] = None,
                  configuration_valid: bool = True,
-                 target_location: Optional[str] = "mock-database-id"):
+                 target_location: Optional[str] = "mock-database-id",
+                 raise_exception: bool = True):
         """
         Initialize the mock storage.
         
@@ -172,11 +173,13 @@ class MockStorage(Storage):
             fail_on_titles: List of video titles that should trigger failures
             configuration_valid: Whether validate_configuration should return True
             target_location: Mock target location identifier
+            raise_exception: If True, raise exceptions on failure; if False, return False
         """
         self.should_fail = should_fail
         self.fail_on_titles = fail_on_titles or []
         self.configuration_valid = configuration_valid
         self.target_location = target_location
+        self.raise_exception = raise_exception
         
         # In-memory storage
         self.stored_videos: List[Dict[str, Any]] = []
@@ -213,10 +216,13 @@ class MockStorage(Storage):
         # Check if we should fail for this video
         title = video_data.get('Title', '')
         if self.should_fail or title in self.fail_on_titles:
-            raise StorageError(
-                f"Mock storage failed for video: {title}",
-                details="Configured to fail in mock implementation"
-            )
+            if self.raise_exception:
+                raise StorageError(
+                    f"Mock storage failed for video: {title}",
+                    details="Configured to fail in mock implementation"
+                )
+            else:
+                return False
         
         # Store the video data
         self.stored_videos.append(video_data.copy())
@@ -292,7 +298,8 @@ class MockMetadataExtractor:
     def __init__(self, metadata_responses: Optional[Dict[str, Dict[str, Any]]] = None,
                  should_fail: bool = False,
                  fail_on_urls: Optional[List[str]] = None,
-                 invalid_urls: Optional[List[str]] = None):
+                 invalid_urls: Optional[List[str]] = None,
+                 configuration_valid: bool = True):
         """
         Initialize the mock metadata extractor.
         
@@ -301,16 +308,19 @@ class MockMetadataExtractor:
             should_fail: If True, all operations will fail
             fail_on_urls: List of URLs that should trigger failures
             invalid_urls: List of URLs that should be considered invalid
+            configuration_valid: Whether validate_configuration should return True
         """
         self.metadata_responses = metadata_responses or {}
         self.should_fail = should_fail
         self.fail_on_urls = fail_on_urls or []
         self.invalid_urls = invalid_urls or []
+        self.configuration_valid = configuration_valid
         
         # Call tracking
         self.validate_url_calls: List[str] = []
         self.extract_video_id_calls: List[str] = []
         self.extract_metadata_calls: List[str] = []
+        self.validate_configuration_calls: List[tuple] = []
         
         # Default metadata for common test scenarios
         self.default_metadata = {
@@ -430,11 +440,24 @@ class MockMetadataExtractor:
         
         return metadata
     
+    def validate_configuration(self) -> bool:
+        """
+        Validate mock configuration.
+        
+        Returns:
+            bool: Configuration validity status
+        """
+        # Track the call
+        self.validate_configuration_calls.append(())
+        
+        return self.configuration_valid
+    
     def reset_calls(self):
         """Reset all call tracking for fresh test scenarios."""
         self.validate_url_calls.clear()
         self.extract_video_id_calls.clear()
         self.extract_metadata_calls.clear()
+        self.validate_configuration_calls.clear()
     
     def set_metadata_for_url(self, url: str, metadata: Dict[str, Any]):
         """Set specific metadata for a URL."""

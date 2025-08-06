@@ -7,16 +7,16 @@ For comprehensive integration tests, see test_main_youtube_integration.py.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import os
-from youtube_notion.main import main
+from src.youtube_notion.main import main
 
 
 class TestMain:
     """Test cases for main application function."""
     
-    @patch('youtube_notion.main.Client')
-    @patch('youtube_notion.main.find_database_by_name')
-    @patch('youtube_notion.main.add_youtube_entry')
-    @patch('youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
+    @patch('src.youtube_notion.main.Client')
+    @patch('src.youtube_notion.main.find_database_by_name')
+    @patch('src.youtube_notion.main.add_youtube_entry')
+    @patch('src.youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test-token'}, clear=True)
     def test_main_success_flow(self, mock_dotenv, mock_add_entry, mock_find_db, mock_client_class):
         """Test successful execution of main function."""
@@ -38,7 +38,7 @@ class TestMain:
         mock_find_db.assert_called_once()
         mock_add_entry.assert_called_once()
     
-    @patch('youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
+    @patch('src.youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
     @patch.dict(os.environ, {}, clear=True)
     def test_main_missing_token(self, mock_dotenv):
         """Test main function with missing NOTION_TOKEN."""
@@ -46,9 +46,9 @@ class TestMain:
         result = main()
         assert result is False
     
-    @patch('youtube_notion.main.Client')
-    @patch('youtube_notion.main.find_database_by_name')
-    @patch('youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
+    @patch('src.youtube_notion.main.Client')
+    @patch('src.youtube_notion.main.find_database_by_name')
+    @patch('src.youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test-token'}, clear=True)
     def test_main_database_not_found(self, mock_dotenv, mock_find_db, mock_client_class):
         """Test main function when database is not found."""
@@ -62,10 +62,10 @@ class TestMain:
         # Should return False for failure
         assert result is False
     
-    @patch('youtube_notion.main.Client')
-    @patch('youtube_notion.main.find_database_by_name')
-    @patch('youtube_notion.main.add_youtube_entry')
-    @patch('youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
+    @patch('src.youtube_notion.main.Client')
+    @patch('src.youtube_notion.main.find_database_by_name')
+    @patch('src.youtube_notion.main.add_youtube_entry')
+    @patch('src.youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test-token'}, clear=True)
     def test_main_add_entry_failure(self, mock_dotenv, mock_add_entry, mock_find_db, mock_client_class):
         """Test main function when adding entry fails."""
@@ -80,9 +80,9 @@ class TestMain:
         # Should return False for failure
         assert result is False
     
-    @patch('youtube_notion.main.Client')
-    @patch('youtube_notion.main.find_database_by_name')
-    @patch('youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
+    @patch('src.youtube_notion.main.Client')
+    @patch('src.youtube_notion.main.find_database_by_name')
+    @patch('src.youtube_notion.config.settings.load_dotenv')  # Mock dotenv loading
     @patch.dict(os.environ, {'NOTION_TOKEN': 'test-token'}, clear=True)
     def test_main_notion_client_exception(self, mock_dotenv, mock_find_db, mock_client_class):
         """Test main function when Notion client raises exception."""

@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-Test runner script that sets up the proper Python path and runs tests.
+Unit test runner script that sets up the proper Python path and runs unit tests only.
+
+Unit tests are fast, isolated tests that don't require external dependencies or API keys.
+They use mock implementations and should complete in under 10 seconds.
+
+Usage:
+    python run_tests.py
 """
 
 import sys
 import os
 import subprocess
 
-# Add src to Python path
+# Add src to Python path (only path setup, no environment loading)
 project_root = os.path.dirname(os.path.abspath(__file__))
 src_path = os.path.join(project_root, 'src')
 
-# Set PYTHONPATH environment variable
+# Set PYTHONPATH environment variable (minimal environment setup)
 env = os.environ.copy()
 current_path = env.get('PYTHONPATH', '')
 new_paths = [src_path]
@@ -19,37 +25,19 @@ if current_path:
     new_paths.append(current_path)
 env['PYTHONPATH'] = os.pathsep.join(new_paths)
 
-def run_tests():
-    """Run all tests using pytest."""
+def run_unit_tests():
+    """Run unit tests only using pytest."""
     try:
-        # Try to run with pytest first
-        result = subprocess.run([
-            sys.executable, '-m', 'pytest', 'tests/', '-v'
-        ], env=env, check=True)
+        print("Running unit tests (fast, no external dependencies)...")
+        cmd = [sys.executable, '-m', 'pytest', 'tests/unit/', '-v']
+        result = subprocess.run(cmd, env=env, check=True)
         return result.returncode
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("pytest not available, running tests individually...")
-        
-        # Fallback to running tests individually
-        test_files = [
-            'tests/test_main.py',
-            'tests/test_markdown_converter.py',
-            'tests/test_integration.py',
-            'tests/test_notion_operations.py',
-            'tests/test_timestamp_enrichment.py',
-            'tests/test_end_to_end_timestamps.py',
-            'tests/test_error_handling.py',
-            'tests/test_performance.py'
-        ]
-        
-        for test_file in test_files:
-            print(f"\n=== Running {test_file} ===")
-            result = subprocess.run([sys.executable, test_file], env=env)
-            if result.returncode != 0:
-                return result.returncode
-        
-        return 0
+    except subprocess.CalledProcessError:
+        return 1
+    except FileNotFoundError:
+        print("Error: pytest not available. Please install pytest: pip install pytest")
+        return 1
 
 if __name__ == '__main__':
-    exit_code = run_tests()
+    exit_code = run_unit_tests()
     sys.exit(exit_code)

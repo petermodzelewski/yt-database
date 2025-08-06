@@ -498,7 +498,7 @@ class TestErrorHandling:
         enhanced = mock_writer._enhance_error_message(original_error, 1, 3)
         
         assert isinstance(enhanced, QuotaExceededError)
-        assert "Quota limit reached" in str(enhanced)
+        assert "Failed after 1/3 attempts" in str(enhanced)
         assert "Quota type: daily" in str(enhanced)
         assert "Retry after: 45s" in str(enhanced)  # 30 + 15 buffer
     

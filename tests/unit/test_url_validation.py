@@ -1,13 +1,13 @@
 """
 Unit tests for YouTube URL validation and video ID extraction.
 
-This module tests the URL parsing functionality of the YouTubeProcessor,
+This module tests the URL parsing functionality of the VideoMetadataExtractor,
 including various YouTube URL formats, edge cases, and error scenarios.
 """
 
 import pytest
-from youtube_notion.processors.youtube_processor import YouTubeProcessor
-from youtube_notion.processors.exceptions import InvalidURLError
+from src.youtube_notion.extractors.video_metadata_extractor import VideoMetadataExtractor
+from src.youtube_notion.utils.exceptions import InvalidURLError
 
 
 class TestURLValidation:
@@ -15,7 +15,7 @@ class TestURLValidation:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        self.extractor = VideoMetadataExtractor()
     
     def test_validate_youtube_url_valid_urls(self):
         """Test validation of valid YouTube URLs."""
@@ -31,7 +31,7 @@ class TestURLValidation:
         ]
         
         for url in valid_urls:
-            assert self.processor.validate_youtube_url(url), f"URL should be valid: {url}"
+            assert self.extractor.validate_url(url), f"URL should be valid: {url}"
     
     def test_validate_youtube_url_invalid_urls(self):
         """Test validation of invalid URLs."""
@@ -51,7 +51,7 @@ class TestURLValidation:
         ]
         
         for url in invalid_urls:
-            assert not self.processor.validate_youtube_url(url), f"URL should be invalid: {url}"
+            assert not self.extractor.validate_url(url), f"URL should be invalid: {url}"
 
 
 class TestVideoIDExtraction:
@@ -59,7 +59,7 @@ class TestVideoIDExtraction:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        self.extractor = VideoMetadataExtractor()
         self.test_video_id = "dQw4w9WgXcQ"
     
     def test_extract_video_id_standard_urls(self):
@@ -72,7 +72,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
     
     def test_extract_video_id_short_urls(self):
@@ -84,7 +84,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
     
     def test_extract_video_id_with_parameters(self):
@@ -105,7 +105,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
     
     def test_extract_video_id_embed_urls(self):
@@ -117,7 +117,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
     
     def test_extract_video_id_legacy_urls(self):
@@ -128,7 +128,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
     
     def test_extract_video_id_no_protocol(self):
@@ -140,7 +140,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
     
     def test_extract_video_id_with_whitespace(self):
@@ -151,7 +151,7 @@ class TestVideoIDExtraction:
         ]
         
         for url, expected_id in test_cases:
-            result = self.processor._extract_video_id(url)
+            result = self.extractor.extract_video_id(url)
             assert result == expected_id, f"Expected {expected_id}, got {result} for URL: {url}"
 
 
@@ -160,7 +160,7 @@ class TestVideoIDExtractionErrors:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        self.extractor = VideoMetadataExtractor()
     
     def test_extract_video_id_invalid_input_types(self):
         """Test extraction with invalid input types."""
@@ -168,13 +168,13 @@ class TestVideoIDExtractionErrors:
         
         for invalid_input in invalid_inputs:
             with pytest.raises(InvalidURLError) as exc_info:
-                self.processor._extract_video_id(invalid_input)
+                self.extractor.extract_video_id(invalid_input)
             assert "URL must be a non-empty string" in str(exc_info.value)
     
     def test_extract_video_id_empty_string(self):
         """Test extraction with empty string."""
         with pytest.raises(InvalidURLError) as exc_info:
-            self.processor._extract_video_id("")
+            self.extractor.extract_video_id("")
         assert "URL must be a non-empty string" in str(exc_info.value)
     
     def test_extract_video_id_invalid_domains(self):
@@ -188,7 +188,7 @@ class TestVideoIDExtractionErrors:
         
         for url in invalid_domains:
             with pytest.raises(InvalidURLError) as exc_info:
-                self.processor._extract_video_id(url)
+                self.extractor.extract_video_id(url)
             assert "not from a supported YouTube domain" in str(exc_info.value)
     
     def test_extract_video_id_malformed_urls(self):
@@ -204,7 +204,7 @@ class TestVideoIDExtractionErrors:
         
         for url in malformed_urls:
             with pytest.raises(InvalidURLError):
-                self.processor._extract_video_id(url)
+                self.extractor.extract_video_id(url)
     
     def test_extract_video_id_invalid_video_ids(self):
         """Test extraction with invalid video ID formats."""
@@ -219,7 +219,7 @@ class TestVideoIDExtractionErrors:
         
         for url in invalid_video_ids:
             with pytest.raises(InvalidURLError) as exc_info:
-                self.processor._extract_video_id(url)
+                self.extractor.extract_video_id(url)
             assert "invalid format" in str(exc_info.value)
 
 
@@ -228,7 +228,7 @@ class TestVideoIDValidation:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        self.extractor = VideoMetadataExtractor()
     
     def test_is_valid_video_id_valid_ids(self):
         """Test validation of valid video IDs."""
@@ -245,7 +245,7 @@ class TestVideoIDValidation:
         ]
         
         for video_id in valid_ids:
-            assert self.processor._is_valid_video_id(video_id), f"Video ID should be valid: {video_id}"
+            assert self.extractor._is_valid_video_id(video_id), f"Video ID should be valid: {video_id}"
     
     def test_is_valid_video_id_invalid_ids(self):
         """Test validation of invalid video IDs."""
@@ -264,7 +264,7 @@ class TestVideoIDValidation:
         ]
         
         for video_id in invalid_ids:
-            assert not self.processor._is_valid_video_id(video_id), f"Video ID should be invalid: {video_id}"
+            assert not self.extractor._is_valid_video_id(video_id), f"Video ID should be invalid: {video_id}"
     
     def test_is_valid_video_id_edge_cases(self):
         """Test validation edge cases."""
@@ -280,7 +280,7 @@ class TestVideoIDValidation:
         ]
         
         for video_id, expected in edge_cases:
-            result = self.processor._is_valid_video_id(video_id)
+            result = self.extractor._is_valid_video_id(video_id)
             assert result == expected, f"Video ID {video_id} should be {expected}, got {result}"
 
 
@@ -289,7 +289,7 @@ class TestIntegrationScenarios:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.processor = YouTubeProcessor.from_api_keys(gemini_api_key="test_key")
+        self.extractor = VideoMetadataExtractor()
     
     def test_real_youtube_urls(self):
         """Test with real YouTube URLs and their expected video IDs."""
@@ -304,10 +304,10 @@ class TestIntegrationScenarios:
         
         for url, expected_id in real_urls:
             # Test validation
-            assert self.processor.validate_youtube_url(url), f"URL should be valid: {url}"
+            assert self.extractor.validate_url(url), f"URL should be valid: {url}"
             
             # Test extraction
-            extracted_id = self.processor._extract_video_id(url)
+            extracted_id = self.extractor.extract_video_id(url)
             assert extracted_id == expected_id, f"Expected {expected_id}, got {extracted_id}"
     
     def test_url_variations_same_video(self):
@@ -327,7 +327,7 @@ class TestIntegrationScenarios:
         ]
         
         for url in url_variations:
-            extracted_id = self.processor._extract_video_id(url)
+            extracted_id = self.extractor.extract_video_id(url)
             assert extracted_id == video_id, f"URL {url} should extract to {video_id}, got {extracted_id}"
     
     def test_error_consistency(self):
@@ -341,8 +341,8 @@ class TestIntegrationScenarios:
         
         for url in invalid_urls:
             # Validation should return False
-            assert not self.processor.validate_youtube_url(url), f"URL should be invalid: {url}"
+            assert not self.extractor.validate_url(url), f"URL should be invalid: {url}"
             
             # Extraction should raise InvalidURLError
             with pytest.raises(InvalidURLError):
-                self.processor._extract_video_id(url)
+                self.extractor.extract_video_id(url)

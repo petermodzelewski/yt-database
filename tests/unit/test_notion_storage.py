@@ -53,7 +53,7 @@ class TestNotionStorage:
         
         client = self.storage.client
         
-        mock_client_class.assert_called_once_with(auth=self.notion_token)
+        mock_client_class.assert_called_once_with(auth=self.notion_token, timeout_ms=self.storage.timeout_seconds * 1000)
         assert client == mock_client
         assert self.storage._client == mock_client
     
@@ -69,11 +69,9 @@ class TestNotionStorage:
         assert client == mock_client
     
     def test_client_property_raises_on_missing_token(self):
-        """Test that client property raises error when token is missing."""
-        storage = NotionStorage("", "db", "parent")
-        
+        """Test that NotionStorage raises error when token is missing."""
         with pytest.raises(ConfigurationError, match="Notion token is required"):
-            _ = storage.client
+            NotionStorage("", "db", "parent")
     
     @patch('src.youtube_notion.storage.notion_storage.Client')
     @patch('src.youtube_notion.storage.notion_storage.enrich_timestamps_with_links')
@@ -194,29 +192,24 @@ class TestNotionStorage:
         with patch('src.youtube_notion.storage.notion_storage.enrich_timestamps_with_links'), \
              patch('src.youtube_notion.storage.notion_storage.markdown_to_notion_blocks'):
             
-            with pytest.raises(StorageError, match="Failed to store video summary"):
+            with pytest.raises(StorageError, match="Unexpected error during Notion API call"):
                 self.storage.store_video_summary(self.sample_video_data)
     
     def test_validate_configuration_missing_token(self):
         """Test configuration validation fails with missing token."""
-        storage = NotionStorage("", "db", "parent")
-        
         with pytest.raises(ConfigurationError, match="Notion token is required"):
-            storage.validate_configuration()
+            NotionStorage("", "db", "parent")
     
     def test_validate_configuration_missing_database_name(self):
         """Test configuration validation fails with missing database name."""
-        storage = NotionStorage("token", "", "parent")
-        
         with pytest.raises(ConfigurationError, match="Database name is required"):
-            storage.validate_configuration()
+            NotionStorage("token", "", "parent")
     
     def test_validate_configuration_missing_parent_page(self):
-        """Test configuration validation fails with missing parent page name."""
+        """Test configuration validation succeeds with empty parent page name (optional)."""
+        # Parent page name is optional, so this should not raise an error
         storage = NotionStorage("token", "db", "")
-        
-        with pytest.raises(ConfigurationError, match="Parent page name is required"):
-            storage.validate_configuration()
+        assert storage.parent_page_name == ""
     
     @patch('src.youtube_notion.storage.notion_storage.Client')
     def test_validate_configuration_success(self, mock_client_class):
@@ -228,7 +221,7 @@ class TestNotionStorage:
         result = self.storage.validate_configuration()
         
         assert result is True
-        mock_client_class.assert_called_once_with(auth=self.notion_token)
+        mock_client_class.assert_called_once_with(auth=self.notion_token, timeout_ms=self.storage.timeout_seconds * 1000)
         mock_client.search.assert_called_once_with(filter={"property": "object", "value": "database"})
     
     @patch('src.youtube_notion.storage.notion_storage.Client')
@@ -369,7 +362,7 @@ class TestNotionStorage:
         mock_client_class.return_value = mock_client
         mock_client.search.side_effect = Exception("API Error")
         
-        with pytest.raises(StorageError, match="Failed to find target database"):
+        with pytest.raises(StorageError, match="Unexpected error during Notion API call"):
             self.storage.find_target_location()
     
     @patch('src.youtube_notion.storage.notion_storage.Client')

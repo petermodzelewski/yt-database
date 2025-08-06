@@ -12,19 +12,18 @@ from .notion_db.operations import find_database_by_name, add_youtube_entry
 from .config.example_data import EXAMPLE_DATA
 from .config import (
     ApplicationConfig,
-    ConfigurationError,
     print_configuration_error
 )
 from .config.factory import ComponentFactory
 from .processors.video_processor import VideoProcessor
 from .utils.exceptions import (
     VideoProcessingError,
-    ConfigurationError,
     MetadataExtractionError,
     SummaryGenerationError,
     StorageError,
     InvalidURLError,
     APIError,
+    ConfigurationError,
     VideoUnavailableError,
     QuotaExceededError
 )
@@ -200,62 +199,95 @@ def process_youtube_video(youtube_url: str, custom_prompt: Optional[str], config
         
         return video_data
         
-    except Exception as e:
-        # Handle all the specific exception types that the old code handled
-        error_type = type(e).__name__
+    except InvalidURLError as e:
+        print(f"Error: Invalid YouTube URL - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• Ensure the URL is from YouTube (youtube.com or youtu.be)")
+        print("• Check that the video ID is 11 characters long")
+        print("• Try copying the URL directly from your browser")
+        return None
         
-        if 'InvalidURLError' in error_type:
-            print(f"Error: Invalid YouTube URL - {e}")
-            if hasattr(e, 'details') and e.details:
-                print(f"Details: {e.details}")
-            return None
-            
-        elif 'VideoUnavailableError' in error_type:
-            print(f"Error: Video is not available - {e}")
-            if hasattr(e, 'details') and e.details:
-                print(f"Details: {e.details}")
-            print("The video may be private, deleted, or restricted in your region.")
-            return None
-            
-        elif 'QuotaExceededError' in error_type:
-            print(f"Error: API quota exceeded - {e}")
-            if hasattr(e, 'api_name'):
-                print(f"API: {e.api_name}")
-            if hasattr(e, 'quota_type'):
-                print(f"Quota type: {e.quota_type}")
-            print("Please wait before trying again or check your API usage limits.")
-            return None
-            
-        elif 'APIError' in error_type:
-            print(f"Error: API call failed - {e}")
-            if hasattr(e, 'api_name'):
-                print(f"API: {e.api_name}")
-            if hasattr(e, 'details') and e.details:
-                print(f"Details: {e.details}")
-            return None
-            
-        elif 'YouTubeProcessingError' in error_type:
-            print(f"Error: YouTube processing failed - {e}")
-            if hasattr(e, 'details') and e.details:
-                print(f"Details: {e.details}")
-            return None
-            
-        elif 'VideoProcessingError' in error_type:
-            print(f"Error: Video processing failed - {e}")
-            if hasattr(e, 'details') and e.details:
-                print(f"Details: {e.details}")
-            return None
-            
-        elif 'ConfigurationError' in error_type:
-            print(f"Error: Configuration error - {e}")
-            if hasattr(e, 'details') and e.details:
-                print(f"Details: {e.details}")
-            return None
-            
+    except VideoUnavailableError as e:
+        print(f"Error: Video is not available - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• The video may be private, deleted, or restricted")
+        print("• Check if the video is available in your region")
+        print("• Verify the video URL is correct")
+        return None
+        
+    except QuotaExceededError as e:
+        print(f"Error: API quota exceeded - {e}")
+        if hasattr(e, 'api_name'):
+            print(f"API: {e.api_name}")
+        if hasattr(e, 'quota_type'):
+            print(f"Quota type: {e.quota_type}")
+        if hasattr(e, 'retry_delay_seconds') and e.retry_delay_seconds:
+            print(f"Retry after: {e.retry_delay_seconds + 15} seconds")
+        print("\nTroubleshooting:")
+        print("• Wait before trying again (see retry delay above)")
+        print("• Check your API usage limits in the respective console")
+        print("• Consider upgrading your API plan if needed")
+        return None
+        
+    except APIError as e:
+        print(f"Error: API call failed - {e}")
+        if hasattr(e, 'api_name'):
+            print(f"API: {e.api_name}")
+        if hasattr(e, 'status_code'):
+            print(f"Status code: {e.status_code}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        
+        # Provide specific troubleshooting based on API and error type
+        error_message = str(e).lower()
+        print("\nTroubleshooting:")
+        if 'authentication' in error_message or 'api key' in error_message:
+            print("• Check that your API key is valid and properly configured")
+            print("• Ensure the API key has the necessary permissions")
+            print("• Verify the API key is not expired")
+        elif 'network' in error_message or 'timeout' in error_message:
+            print("• Check your internet connection")
+            print("• Try again in a few moments")
+            print("• Consider increasing timeout settings if available")
         else:
-            print(f"Error: Unexpected error during YouTube processing - {e}")
-            print("Please check your configuration and try again.")
-            return None
+            print("• Verify your API configuration")
+            print("• Check the API service status")
+            print("• Try again in a few moments")
+        return None
+        
+    except (SummaryGenerationError, MetadataExtractionError, StorageError) as e:
+        error_type = type(e).__name__.replace('Error', '').lower()
+        print(f"Error: {error_type.replace('_', ' ').title()} failed - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• Check your configuration settings")
+        print("• Verify all required API keys are set")
+        print("• Try again in a few moments")
+        return None
+        
+    except ConfigurationError as e:
+        print(f"Error: Configuration error - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        print("\nTroubleshooting:")
+        print("• Check your environment variables (.env file)")
+        print("• Ensure all required configuration is provided")
+        print("• Verify configuration values are valid")
+        return None
+        
+    except Exception as e:
+        print(f"Error: Unexpected error during YouTube processing - {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("\nTroubleshooting:")
+        print("• Check your configuration and try again")
+        print("• Ensure all dependencies are properly installed")
+        print("• If the problem persists, please report this issue")
+        return None
 
 
 def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig, batch_mode: bool = False) -> bool:

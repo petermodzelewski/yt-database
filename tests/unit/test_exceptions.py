@@ -81,9 +81,23 @@ class TestSpecificExceptions:
     
     def test_configuration_error(self):
         """Test ConfigurationError functionality."""
-        error = ConfigurationError("Missing API key", "GEMINI_API_KEY not found")
+        # Test basic error
+        error = ConfigurationError("Missing API key", details="GEMINI_API_KEY not found")
         assert error.message == "Missing API key"
         assert error.details == "GEMINI_API_KEY not found"
+        assert error.missing_vars == []
+        assert error.invalid_vars == {}
+        
+        # Test error with missing and invalid vars
+        error_with_vars = ConfigurationError(
+            "Configuration validation failed",
+            missing_vars=["NOTION_TOKEN", "GEMINI_API_KEY"],
+            invalid_vars={"DEBUG": "must be true or false"},
+            details="Multiple validation errors"
+        )
+        assert error_with_vars.missing_vars == ["NOTION_TOKEN", "GEMINI_API_KEY"]
+        assert error_with_vars.invalid_vars == {"DEBUG": "must be true or false"}
+        assert error_with_vars.details == "Multiple validation errors"
         
         with pytest.raises(ConfigurationError):
             raise error

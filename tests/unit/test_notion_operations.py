@@ -21,11 +21,11 @@ class TestAddYouTubeEntry:
         result = add_youtube_entry(
             mock_notion, 
             "test-db-id", 
-            sample_video_data["title"], 
-            sample_video_data["summary"], 
-            sample_video_data["video_url"], 
-            sample_video_data["channel"], 
-            sample_video_data["cover_url"]
+            sample_video_data["Title"], 
+            sample_video_data["Summary"], 
+            sample_video_data["Video URL"], 
+            sample_video_data["Channel"], 
+            sample_video_data["Cover"]
         )
         
         # Verify the function returned the page ID
@@ -46,7 +46,7 @@ class TestAddYouTubeEntry:
         # First block should be YouTube embed
         first_block = children[0]
         assert first_block['type'] == 'embed'
-        assert first_block['embed']['url'] == sample_video_data["video_url"]
+        assert first_block['embed']['url'] == sample_video_data["Video URL"]
         
         # Second block should be divider
         second_block = children[1]
@@ -59,14 +59,14 @@ class TestAddYouTubeEntry:
         
         # Verify properties
         properties = call_args.kwargs['properties']
-        assert properties['Title']['title'][0]['text']['content'] == sample_video_data["title"]
-        assert properties['Video URL']['url'] == sample_video_data["video_url"]
-        assert properties['Channel']['rich_text'][0]['text']['content'] == sample_video_data["channel"]
+        assert properties['Title']['title'][0]['text']['content'] == sample_video_data["Title"]
+        assert properties['Video URL']['url'] == sample_video_data["Video URL"]
+        assert properties['Channel']['rich_text'][0]['text']['content'] == sample_video_data["Channel"]
         
         # Verify cover
         cover = call_args.kwargs['cover']
         assert cover['type'] == 'external'
-        assert cover['external']['url'] == sample_video_data["cover_url"]
+        assert cover['external']['url'] == sample_video_data["Cover"]
     
     def test_add_youtube_entry_api_error(self, sample_video_data):
         """Test handling of Notion API errors."""
@@ -76,11 +76,11 @@ class TestAddYouTubeEntry:
         result = add_youtube_entry(
             mock_notion, 
             "test-db-id", 
-            sample_video_data["title"], 
-            sample_video_data["summary"], 
-            sample_video_data["video_url"], 
-            sample_video_data["channel"], 
-            sample_video_data["cover_url"]
+            sample_video_data["Title"], 
+            sample_video_data["Summary"], 
+            sample_video_data["Video URL"], 
+            sample_video_data["Channel"], 
+            sample_video_data["Cover"]
         )
         
         # Function should return None when an error occurs
@@ -94,11 +94,11 @@ class TestAddYouTubeEntry:
         result = add_youtube_entry(
             mock_notion, 
             "test-db-id", 
-            sample_video_data["title"], 
+            sample_video_data["Title"], 
             "", 
-            sample_video_data["video_url"], 
-            sample_video_data["channel"], 
-            sample_video_data["cover_url"]
+            sample_video_data["Video URL"], 
+            sample_video_data["Channel"], 
+            sample_video_data["Cover"]
         )
         
         assert result == "test-page-id"

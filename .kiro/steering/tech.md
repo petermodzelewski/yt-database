@@ -14,12 +14,22 @@ inclusion: always
 ### Package Structure
 - Use relative imports within `src/youtube_notion/` package
 - Follow modern Python packaging with `pyproject.toml`
-- Maintain clear module separation: `config/`, `notion_db/`, `processors/`, `utils/`
+- Maintain clear module separation with component-based architecture:
+  - `interfaces/`: Abstract base classes for components
+  - `extractors/`: Video metadata extraction logic
+  - `writers/`: Summary generation implementations
+  - `storage/`: Data persistence backends
+  - `processors/`: Orchestration and workflow coordination
+  - `config/`: Configuration, factory, and example data
+  - `utils/`: Shared utilities and exception classes
 
 ### Testing Requirements
 - **Always use**: `python run_tests.py` (handles PYTHONPATH automatically)
 - **Avoid**: Direct `pytest` calls without proper path setup
 - Install in development mode: `pip install -e .` before testing
+- **Test Structure**: Separate unit tests (`tests/unit/`) from integration tests (`tests/integration/`)
+- **Unit Tests**: Fast, isolated tests using mock implementations from `tests/fixtures/mock_implementations.py`
+- **Integration Tests**: Use `.env-test` configuration and test database "YT Summaries [TEST]"
 
 ### Test-Driven Development Standards
 - **MANDATORY**: Write proper unit tests for every functionality change
@@ -33,7 +43,12 @@ inclusion: always
 
 ### Error Handling Standards
 - Return boolean success indicators from main functions
-- Use specific exception types with retry logic
+- Use structured exception hierarchy from `utils/exceptions.py`:
+  - `VideoProcessingError`: Base exception for video processing failures
+  - `ConfigurationError`: Configuration validation failures
+  - `MetadataExtractionError`: Video metadata extraction failures
+  - `SummaryGenerationError`: AI summary generation failures
+  - `StorageError`: Data persistence failures
 - Provide user-friendly error messages with troubleshooting context
 - Implement graceful fallbacks (YouTube API → web scraping)
 - **Intelligent Quota Management**: Parse `retryDelay` from API responses and wait appropriately
@@ -42,16 +57,26 @@ inclusion: always
 
 ### Configuration Management
 - Use `.env` files with `python-dotenv` for environment variables
+- Use `.env-test` for integration test configuration
 - Validate configuration based on operation mode (YouTube vs example data)
 - Support multiple API providers with graceful degradation
+- **Component Factory**: Use `config/factory.py` for dependency injection and component creation
+- **Interface-Based Design**: All components implement abstract interfaces for testability and extensibility
 
 ## Code Style Rules
 
 ### Import Conventions
 ```python
 # Internal package imports (relative)
-from .notion_db.operations import find_database_by_name
+from .interfaces.storage import Storage
+from .interfaces.summary_writer import SummaryWriter
+from .storage.notion_storage import NotionStorage
+from .writers.gemini_summary_writer import GeminiSummaryWriter
+from .extractors.video_metadata_extractor import VideoMetadataExtractor
+from .processors.video_processor import VideoProcessor
+from .config.factory import ComponentFactory
 from .config.example_data import EXAMPLE_DATA
+from .utils.exceptions import VideoProcessingError, ConfigurationError
 
 # External dependencies (absolute)
 from notion_client import Client

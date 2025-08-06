@@ -6,6 +6,8 @@ clear error categorization and enables proper error handling throughout
 the application.
 """
 
+from typing import Optional, List, Dict
+
 
 class VideoProcessingError(Exception):
     """
@@ -42,7 +44,21 @@ class ConfigurationError(VideoProcessingError):
     This includes missing API keys, invalid database names, or malformed
     configuration values.
     """
-    pass
+    
+    def __init__(self, message: str, missing_vars: Optional[List[str]] = None, 
+                 invalid_vars: Optional[Dict[str, str]] = None, details: str = None):
+        """
+        Initialize configuration error with validation details.
+        
+        Args:
+            message: Human-readable error message
+            missing_vars: List of missing required variables
+            invalid_vars: Dictionary of invalid variables and their issues
+            details: Additional error details
+        """
+        super().__init__(message, details)
+        self.missing_vars = missing_vars or []
+        self.invalid_vars = invalid_vars or {}
 
 
 class MetadataExtractionError(VideoProcessingError):

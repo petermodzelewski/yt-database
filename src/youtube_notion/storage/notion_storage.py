@@ -48,8 +48,9 @@ class NotionStorage(Storage):
         if not database_name or not database_name.strip():
             raise ConfigurationError("Database name is required and cannot be empty")
         
-        if not parent_page_name or not parent_page_name.strip():
-            raise ConfigurationError("Parent page name is required and cannot be empty")
+        # Parent page name is optional (empty string allowed), but if provided, it cannot be whitespace-only
+        if parent_page_name and not parent_page_name.strip():
+            raise ConfigurationError("Parent page name cannot be whitespace-only")
         
         if max_retries < 0:
             raise ConfigurationError("Max retries must be non-negative")
@@ -171,56 +172,67 @@ class NotionStorage(Storage):
         Returns:
             Exception: Appropriate application exception
         """
-        if error.status == 401:
+        error_body = getattr(error, 'body', str(error))
+        error_status = getattr(error, 'status', 'unknown')
+        
+        if error_status == 401:
             return ConfigurationError(
-                f"Notion API authentication failed: {error.body}",
-                details="Check that your Notion token is valid"
+                f"Notion API authentication failed: {error_body}",
+                details="Check that your Notion token is valid and not expired. "
+                       "You may need to regenerate your integration token."
             )
         
-        elif error.status == 403:
+        elif error_status == 403:
             return ConfigurationError(
-                f"Notion API access forbidden: {error.body}",
-                details="Check that your Notion integration has access to the database and page"
+                f"Notion API access forbidden: {error_body}",
+                details="Check that your Notion integration has access to the database and page. "
+                       "Ensure the integration is shared with the target page and database."
             )
         
-        elif error.status == 404:
+        elif error_status == 404:
             return StorageError(
-                f"Notion resource not found: {error.body}",
-                details="The database or page may have been deleted or moved"
+                f"Notion resource not found: {error_body}",
+                details="The database or page may have been deleted, moved, or renamed. "
+                       "Verify that the database name and parent page name are correct."
             )
         
-        elif error.status == 409:
+        elif error_status == 409:
             return StorageError(
-                f"Notion API conflict: {error.body}",
-                details="The resource may have been modified by another process"
+                f"Notion API conflict: {error_body}",
+                details="The resource may have been modified by another process. "
+                       "This is usually a temporary issue - try again."
             )
         
-        elif error.status == 422:
+        elif error_status == 422:
             return StorageError(
-                f"Notion API validation error: {error.body}",
-                details="The request data may be invalid or malformed"
+                f"Notion API validation error: {error_body}",
+                details="The request data may be invalid or malformed. "
+                       "This could be due to unsupported content or formatting."
             )
         
-        elif error.status == 429:
+        elif error_status == 429:
             return APIError(
-                f"Notion API rate limit exceeded: {error.body}",
+                f"Notion API rate limit exceeded: {error_body}",
                 api_name="Notion API",
-                status_code=error.status,
-                details="Too many requests. Try again later."
+                status_code=error_status,
+                details="Too many requests sent to Notion API. "
+                       "Wait a few minutes before trying again."
             )
         
-        elif error.status >= 500:
+        elif error_status >= 500:
             return APIError(
-                f"Notion API server error: {error.body}",
+                f"Notion API server error: {error_body}",
                 api_name="Notion API",
-                status_code=error.status,
-                details="Notion service is experiencing issues. Try again later."
+                status_code=error_status,
+                details="Notion service is experiencing issues. "
+                       "Check Notion's status page and try again later."
             )
         
         else:
             return StorageError(
-                f"Notion API error: {error.body}",
-                details=f"Status code: {error.status}"
+                f"Notion API error: {error_body}",
+                details=f"Status code: {error_status}. "
+                       "This may be a temporary issue - try again."
             )
     
     def _calculate_backoff_time(self, attempt: int) -> float:
@@ -374,8 +386,7 @@ class NotionStorage(Storage):
                 raise ConfigurationError("Notion token is required")
             if not self.database_name:
                 raise ConfigurationError("Database name is required")
-            if not self.parent_page_name:
-                raise ConfigurationError("Parent page name is required")
+            # Parent page name is optional
             
             # Test Notion client connection
             try:

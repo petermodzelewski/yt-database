@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 import requests
 
 from src.youtube_notion.processors.youtube_processor import YouTubeProcessor
-from src.youtube_notion.processors.exceptions import (
+from src.youtube_notion.utils.exceptions import (
     YouTubeProcessingError,
     InvalidURLError,
     APIError,

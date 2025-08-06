@@ -286,6 +286,7 @@ class VideoMetadataExtractor:
         Get video title, channel, and thumbnail from YouTube.
         
         Uses YouTube Data API v3 if available, otherwise falls back to web scraping.
+        Implements graceful fallback from API to scraping on certain errors.
         
         Args:
             video_id: YouTube video ID
@@ -294,12 +295,34 @@ class VideoMetadataExtractor:
             dict: Video metadata containing title, channel, and other info
             
         Raises:
-            APIError: If API calls fail
+            APIError: If both API and scraping fail
             VideoUnavailableError: If video is not accessible
+            QuotaExceededError: If API quota is exceeded and scraping also fails
         """
+        # Try API first if available
         if self.youtube_api_key:
-            return self._get_metadata_via_api(video_id)
+            try:
+                return self._get_metadata_via_api(video_id)
+            except QuotaExceededError:
+                # Don't fallback on quota errors - user should know about quota limits
+                raise
+            except VideoUnavailableError:
+                # Don't fallback on video unavailable - video is genuinely unavailable
+                raise
+            except APIError as api_error:
+                # For other API errors, try fallback to web scraping
+                try:
+                    print(f"Warning: YouTube API failed ({api_error.api_name}), falling back to web scraping...")
+                    return self._get_metadata_via_scraping(video_id)
+                except Exception as scraping_error:
+                    # If scraping also fails, raise the original API error with context
+                    raise APIError(
+                        f"Both YouTube API and web scraping failed. API error: {str(api_error)}. Scraping error: {str(scraping_error)}",
+                        api_name="YouTube Data API + Web Scraping",
+                        details=f"Original API error: {api_error.details}. Scraping fallback also failed."
+                    )
         else:
+            # No API key available, use web scraping directly
             return self._get_metadata_via_scraping(video_id)
     
     def _get_metadata_via_api(self, video_id: str) -> Dict[str, str]:

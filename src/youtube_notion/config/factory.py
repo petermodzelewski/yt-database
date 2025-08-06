@@ -7,13 +7,17 @@ with proper dependency injection and validation.
 
 from typing import Optional
 from ..interfaces.summary_writer import SummaryWriter
+from typing import TYPE_CHECKING
+
 from ..interfaces.storage import Storage
 from ..extractors.video_metadata_extractor import VideoMetadataExtractor
-from ..writers.gemini_summary_writer import GeminiSummaryWriter
-from ..storage.notion_storage import NotionStorage
 from ..utils.chat_logger import ChatLogger
-from ..utils.exceptions import ConfigurationError
 from .settings import ApplicationConfig, YouTubeProcessorConfig, NotionConfig
+from ..utils.exceptions import ConfigurationError
+
+if TYPE_CHECKING:
+    from ..writers.gemini_summary_writer import GeminiSummaryWriter
+    from ..storage.notion_storage import NotionStorage
 
 
 class ComponentFactory:
@@ -65,6 +69,9 @@ class ComponentFactory:
         youtube_config = self.config.youtube_processor
         
         try:
+            # Import locally to avoid circular imports
+            from ..writers.gemini_summary_writer import GeminiSummaryWriter
+            
             # Create GeminiSummaryWriter with configuration
             summary_writer = GeminiSummaryWriter(
                 api_key=youtube_config.gemini_api_key,
@@ -86,8 +93,7 @@ class ComponentFactory:
             if isinstance(e, ConfigurationError):
                 raise
             raise ConfigurationError(
-                f"Failed to create summary writer: {str(e)}",
-                details=f"Error type: {type(e).__name__}"
+                f"Failed to create summary writer: {str(e)}"
             )
     
     def create_storage(self) -> Storage:
@@ -119,6 +125,9 @@ class ComponentFactory:
                 max_retries = self.config.youtube_processor.max_retries
                 timeout_seconds = self.config.youtube_processor.timeout_seconds
             
+            # Import locally to avoid circular imports
+            from ..storage.notion_storage import NotionStorage
+            
             # Create NotionStorage with configuration
             storage = NotionStorage(
                 notion_token=notion_config.notion_token,
@@ -137,8 +146,7 @@ class ComponentFactory:
             if isinstance(e, ConfigurationError):
                 raise
             raise ConfigurationError(
-                f"Failed to create storage backend: {str(e)}",
-                details=f"Error type: {type(e).__name__}"
+                f"Failed to create storage backend: {str(e)}"
             )
     
     def create_metadata_extractor(self) -> VideoMetadataExtractor:
@@ -177,8 +185,7 @@ class ComponentFactory:
             if isinstance(e, ConfigurationError):
                 raise
             raise ConfigurationError(
-                f"Failed to create metadata extractor: {str(e)}",
-                details=f"Error type: {type(e).__name__}"
+                f"Failed to create metadata extractor: {str(e)}"
             )
     
     def create_all_components(self, chat_logger: Optional[ChatLogger] = None) -> tuple[VideoMetadataExtractor, SummaryWriter, Storage]:
@@ -209,8 +216,7 @@ class ComponentFactory:
             raise
         except Exception as e:
             raise ConfigurationError(
-                f"Failed to create all components: {str(e)}",
-                details=f"Error type: {type(e).__name__}"
+                f"Failed to create all components: {str(e)}"
             )
     
     def validate_all_configurations(self) -> bool:
@@ -241,8 +247,7 @@ class ComponentFactory:
             raise
         except Exception as e:
             raise ConfigurationError(
-                f"Configuration validation failed: {str(e)}",
-                details=f"Error type: {type(e).__name__}"
+                f"Configuration validation failed: {str(e)}"
             )
     
     def _validate_factory_configuration(self):
@@ -356,8 +361,7 @@ class ComponentFactory:
             if isinstance(e, ConfigurationError):
                 raise
             raise ConfigurationError(
-                f"Failed to create factory from environment: {str(e)}",
-                details=f"Error type: {type(e).__name__}"
+                f"Failed to create factory from environment: {str(e)}"
             )
     
     def get_configuration_summary(self) -> dict:
