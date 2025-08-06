@@ -10,8 +10,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from src.youtube_notion.utils.chat_logger import ChatLogger
-from src.youtube_notion.processors.youtube_processor import YouTubeProcessor
-from src.youtube_notion.config.settings import YouTubeProcessorConfig
+from src.youtube_notion.writers.gemini_summary_writer import GeminiSummaryWriter
 
 
 class TestChatLogger:
@@ -114,30 +113,32 @@ class TestChatLogger:
             assert video_id in file_path.name
 
 
-class TestYouTubeProcessorLogging:
-    """Test chat logging integration in YouTubeProcessor."""
+class TestGeminiSummaryWriterLogging:
+    """Test chat logging integration in GeminiSummaryWriter."""
     
-    def test_processor_logs_chat_on_success(self):
-        """Test that processor logs chat when summary generation succeeds."""
-        # Create a processor with mock config
-        config = YouTubeProcessorConfig(
-            gemini_api_key="test_key",
-            youtube_api_key=None
+    def test_writer_logs_chat_on_success(self):
+        """Test that writer logs chat when summary generation succeeds."""
+        # Create a writer with mock chat logger
+        writer = GeminiSummaryWriter(
+            api_key="test_key",
+            max_retries=1
         )
-        processor = YouTubeProcessor(config)
         
         # Mock the chat logger
         mock_logger = MagicMock()
-        processor.chat_logger = mock_logger
+        writer.chat_logger = mock_logger
         
         # Mock the API call to return a response
-        with patch.object(processor, '_api_call_with_retry', return_value="Test summary"):
+        with patch.object(writer, '_call_gemini_api', return_value="Test summary"):
             video_url = "https://youtu.be/dQw4w9WgXcQ"  # Valid 11-character video ID
-            prompt = "Test prompt"
-            metadata = {"title": "Test Video", "channel": "Test Channel"}
+            video_metadata = {
+                "video_id": "dQw4w9WgXcQ",
+                "title": "Test Video", 
+                "channel": "Test Channel"
+            }
             
-            # Call _generate_summary
-            result = processor._generate_summary(video_url, prompt, metadata)
+            # Generate summary
+            result = writer.generate_summary(video_url, video_metadata)
             
             # Verify the result
             assert result == "Test summary"
@@ -146,34 +147,36 @@ class TestYouTubeProcessorLogging:
             mock_logger.log_chat.assert_called_once_with(
                 video_id="dQw4w9WgXcQ",
                 video_url=video_url,
-                prompt=prompt,
+                prompt=writer.default_prompt,
                 response="Test summary",
-                video_metadata=metadata
+                video_metadata=video_metadata
             )
     
-    def test_processor_handles_logging_failure_gracefully(self):
-        """Test that processor continues working even if logging fails."""
-        config = YouTubeProcessorConfig(
-            gemini_api_key="test_key",
-            youtube_api_key=None
+    def test_writer_handles_logging_failure_gracefully(self):
+        """Test that writer continues working even if logging fails."""
+        writer = GeminiSummaryWriter(
+            api_key="test_key",
+            max_retries=1
         )
-        processor = YouTubeProcessor(config)
         
         # Mock the chat logger to raise an exception
         mock_logger = MagicMock()
         mock_logger.log_chat.side_effect = Exception("Logging failed")
-        processor.chat_logger = mock_logger
+        writer.chat_logger = mock_logger
         
         # Mock the API call to return a response
-        with patch.object(processor, '_api_call_with_retry', return_value="Test summary"), \
+        with patch.object(writer, '_call_gemini_api', return_value="Test summary"), \
              patch('builtins.print') as mock_print:  # Capture the warning print
             
             video_url = "https://youtu.be/dQw4w9WgXcQ"  # Valid 11-character video ID
-            prompt = "Test prompt"
-            metadata = {"title": "Test Video", "channel": "Test Channel"}
+            video_metadata = {
+                "video_id": "dQw4w9WgXcQ",
+                "title": "Test Video", 
+                "channel": "Test Channel"
+            }
             
-            # Call _generate_summary - should not raise exception
-            result = processor._generate_summary(video_url, prompt, metadata)
+            # Generate summary - should not raise exception
+            result = writer.generate_summary(video_url, video_metadata)
             
             # Verify the result is still returned
             assert result == "Test summary"

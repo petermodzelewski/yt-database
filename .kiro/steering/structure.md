@@ -119,9 +119,7 @@ from .config.example_data import EXAMPLE_DATA
 from .utils.exceptions import VideoProcessingError, ConfigurationError
 from .utils.markdown_converter import parse_rich_text
 
-# Legacy imports (deprecated, use new architecture)
-from .processors.youtube_processor import YouTubeProcessor  # Use VideoProcessor instead
-from .notion_db.operations import find_database_by_name     # Use NotionStorage instead
+# All legacy components have been removed - use new architecture only
 ```
 
 ### Error Handling Strategy

@@ -582,7 +582,7 @@ The system automatically:
 When processing multiple URLs, quota limits don't stop the entire batch:
 
 ```bash
-python youtube_notion_cli.py --file large_batch.txt
+python youtube_notion_cli.py --file urls.txt
 
 # Output:
 [1/10] Processing: https://youtu.be/video1
@@ -801,14 +801,16 @@ End-to-end tests that verify complete functionality with real APIs:
 
 3. **Run integration tests**:
    ```bash
-   # Run all integration tests
+   # Run all tests (unit + integration)
+   python run_tests.py
+   
+   # Run only unit tests (fast)
+   python run_tests.py --unit
+   
+   # Run only integration tests (requires API keys)
+   python run_tests.py --integration
+   # OR use the dedicated integration test runner
    python run_integration_tests.py
-   
-   # Skip slow tests
-   python run_integration_tests.py --fast
-   
-   # Verbose output
-   python run_integration_tests.py --verbose
    ```
 
 #### Integration Test Features
@@ -842,6 +844,8 @@ python run_tests.py
 
 # Run integration tests (requires API keys)
 python run_integration_tests.py
+# OR
+python run_tests.py --integration
 
 # Run all tests with pytest
 python -m pytest tests/ -v
