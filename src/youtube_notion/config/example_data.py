@@ -1,5 +1,4 @@
-EXAMPLE_DATA = {
-    "Summary": """### The Invisible Bottleneck Killing Enterprise AI Projects
+_SUMMARY_TEXT = """### The Invisible Bottleneck Killing Enterprise AI Projects
 
 Poor data chunking is a critical but often overlooked issue that can derail enterprise AI projects, leading to inaccurate results and significant costs. Understanding and implementing effective chunking strategies is foundational to the success of any AI system that relies on large datasets.
 
@@ -53,7 +52,10 @@ To avoid the pitfalls of poor data preparation, follow these five principles:
 | **Are all parts of the task doable?**    | Yes (Necessary tools exist)    | No (Required tools are unavailable)   |
 | **What is the cost of error?**           | Low (Errors are cheap/reversible) | High (Errors are costly/irreversible) |
 
-Ultimately, there is no magic solution for messy data. The path to a high-performing AI system requires confronting the complexities of your data architecture. By applying these principles, you can build a solid foundation for your AI, ensuring more accurate, cost-effective, and truly transformative results.""",
+Ultimately, there is no magic solution for messy data. The path to a high-performing AI system requires confronting the complexities of your data architecture. By applying these principles, you can build a solid foundation for your AI, ensuring more accurate, cost-effective, and truly transformative results."""
+
+EXAMPLE_DATA = {
+    "Summary": "\n\n".join([_SUMMARY_TEXT] * 10),
     "Title": "TEST Chunking 101: The Invisible Bottleneck Killing Enterprise AI Projects",
     "Channel": "AI News & Strategy Daily | Nate B Jones",
     "Video URL": "https://www.youtube.com/watch?v=pMSXPgAUq_k",
