@@ -291,7 +291,7 @@ def markdown_to_notion_blocks(markdown_text):
                 "numbered_list_item": { "rich_text": parse_rich_text(numbered_text) }
             })
         # Handle tables
-        elif stripped_line.startswith('|') and i + 1 < len(lines) and lines[i+1].strip().startswith('|--'):
+        elif stripped_line.startswith('|') and i + 1 < len(lines) and re.match(r'[|:\-\s]+', lines[i+1].strip()):
             table_lines = [stripped_line]
             j = i + 1
             while j < len(lines) and lines[j].strip().startswith('|'):
@@ -332,7 +332,7 @@ def _parse_table_block(table_lines):
 
     # Validate separator line
     separator_cells = [cell.strip() for cell in separator_line.split('|') if cell.strip()]
-    if len(separator_cells) != num_columns or not all(re.match(r'--+', cell) for cell in separator_cells):
+    if len(separator_cells) != num_columns or not all(re.match(r':?--+:?', cell) for cell in separator_cells):
         return None
 
     # Create table block

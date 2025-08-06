@@ -622,6 +622,22 @@ This is a paragraph."""
         self.assertEqual(len(rich_text), 1)
         self.assertEqual(rich_text[0]['text']['content'], '**This should not be bold**\n*This should not be italic*\n[This should not be a link](https://example.com)')
 
+    def test_user_table_example(self):
+        """Test parsing the user's specific table example."""
+        markdown = """| Question                                 | When to Use an Agent (Complex) | When to Use a Workflow (Simpler)      |
+| ---------------------------------------- | ------------------------------ | ------------------------------------- |
+| **Is the task complex enough?**          | Yes (Path to goal is unclear)  | No (Clear, step-by-step process)      |
+| **Is the task valuable enough?**         | Yes (High value, e.g., >$1/run) | No (Low value, e.g., <$0.1/run)       |
+| **Are all parts of the task doable?**    | Yes (Necessary tools exist)    | No (Required tools are unavailable)   |
+| **What is the cost of error?**           | Low (Errors are cheap/reversible) | High (Errors are costly/irreversible) |"""
+        result = markdown_to_notion_blocks(markdown)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['type'], 'table')
+        table = result[0]['table']
+        self.assertEqual(table['table_width'], 3)
+        self.assertEqual(table['has_column_header'], True)
+        self.assertEqual(len(table['children']), 5)
+
 
 if __name__ == '__main__':
     unittest.main()
