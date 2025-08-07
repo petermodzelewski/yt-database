@@ -78,6 +78,43 @@ class TestChatLogger:
         assert "# Gemini Chat Log" in content
         assert "## Video Metadata" not in content
     
+    def test_log_chat_chunk_creates_file(self):
+        """Test that logging a chunk creates a file with correct content."""
+        video_id = "test_video_chunk_123"
+        video_url = f"https://youtu.be/{video_id}"
+        prompt = "Test chunk prompt"
+        response = "Test chunk response"
+        metadata = {
+            "title": "Test Chunk Video",
+            "channel": "Test Chunk Channel",
+        }
+
+        # Log the chat chunk
+        log_file = self.logger.log_chat_chunk(
+            video_id, video_url, prompt, response, metadata,
+            chunk_index=1, start_offset=600, end_offset=1200
+        )
+
+        # Verify file was created
+        assert os.path.exists(log_file)
+        assert f"{video_id}_chunk_1" in os.path.basename(log_file)
+        assert log_file.endswith('.md')
+
+        # Verify content
+        with open(log_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        assert "# Gemini Chat Log (Chunk)" in content
+        assert "Chunk Index**: 1" in content
+        assert "Start Offset**: 600s" in content
+        assert "End Offset**: 1200s" in content
+        assert video_id in content
+        assert video_url in content
+        assert "Test Chunk Video" in content
+        assert "Test Chunk Channel" in content
+        assert prompt in content
+        assert response in content
+
     def test_get_log_files(self):
         """Test retrieving log files."""
         video_id = "test_video_789"

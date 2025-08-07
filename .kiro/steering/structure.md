@@ -29,6 +29,7 @@ src/youtube_notion/              # Main package (use relative imports)
 └── utils/                       # Shared utilities
     ├── exceptions.py            # Exception hierarchy
     ├── chat_logger.py           # Conversation logging
+    ├── video_utils.py           # Video processing utilities
     └── markdown_converter.py
 ```
 
@@ -67,6 +68,7 @@ success = processor.process_video(url)
 | `config/factory.py` | Dependency injection | Creates and configures components based on environment |
 | `utils/exceptions.py` | Error handling | Structured exception hierarchy |
 | `utils/chat_logger.py` | Conversation logging | Automatic cleanup and structured logging |
+| `utils/video_utils.py` | Video processing | Duration parsing, video splitting for long content |
 
 ### Import Conventions
 
@@ -87,6 +89,7 @@ from .processors.video_processor import VideoProcessor
 from .config.factory import ComponentFactory
 from .config.example_data import EXAMPLE_DATA
 from .utils.exceptions import VideoProcessingError, ConfigurationError
+from .utils.video_utils import parse_iso8601_duration, calculate_video_splits
 from .utils.markdown_converter import parse_rich_text
 
 # External dependencies (absolute imports)
@@ -124,6 +127,7 @@ tests/
 │   ├── test_component_factory.py
 │   ├── test_main.py
 │   ├── test_property_based_markdown_converter.py  # Property-based tests
+│   ├── test_video_utils.py      # Video processing utilities tests
 │   └── utils/
 │       ├── test_exceptions.py
 │       ├── test_chat_logger.py

@@ -631,3 +631,71 @@ class TestIntegration:
             writer = GeminiSummaryWriter(api_key="invalid_key")
             with pytest.raises(ConfigurationError):
                 writer.validate_configuration()
+
+
+class TestGeminiSummaryWriterVideoSplitting:
+    """Test video splitting logic in GeminiSummaryWriter."""
+
+    @pytest.fixture
+    def mock_writer(self):
+        """Create a GeminiSummaryWriter with mocked dependencies."""
+        with patch('src.youtube_notion.writers.gemini_summary_writer.genai.Client'):
+            writer = GeminiSummaryWriter(api_key="test_api_key")
+            writer.chat_logger = Mock(spec=ChatLogger)
+            return writer
+
+    @pytest.fixture
+    def long_video_metadata(self):
+        """Sample video metadata for a long video."""
+        return {
+            'video_id': 'long_video_id',
+            'title': 'Long Test Video Title',
+            'channel': 'Test Channel',
+            'duration': 5000  # Longer than MAX_VIDEO_DURATION_SECONDS
+        }
+
+    @patch('src.youtube_notion.writers.gemini_summary_writer.calculate_video_splits')
+    def test_long_video_is_split(self, mock_calculate_splits, mock_writer, long_video_metadata):
+        """Test that a long video is split and processed in chunks."""
+        mock_calculate_splits.return_value = [(0, 2700), (2400, 5000)]
+
+        with patch.object(mock_writer, '_api_call_with_retry') as mock_retry:
+            # Mock return values for each call
+            mock_retry.side_effect = [
+                "Summary for part 1.",
+                "Summary for part 2.",
+            ]
+
+            result = mock_writer.generate_summary(
+                video_url="https://youtube.com/watch?v=long_id",
+                video_metadata=long_video_metadata
+            )
+
+            assert result == "Summary for part 1.\nSummary for part 2."
+            mock_calculate_splits.assert_called_once_with(5000)
+            assert mock_retry.call_count == 2
+
+            # Check calls for each split
+            call1_args, call1_kwargs = mock_retry.call_args_list[0]
+            assert call1_kwargs['start_offset'] == "0s"
+            assert call1_kwargs['end_offset'] == "2700s"
+            assert "This is the first part of a video." in call1_args[2]
+
+            call2_args, call2_kwargs = mock_retry.call_args_list[1]
+            assert call2_kwargs['start_offset'] == "2400s"
+            assert call2_kwargs['end_offset'] == "5000s"
+            assert "This is part 2 of 2 of a video" in call2_args[2]
+            assert "<summary>Summary for part 1.</summary>" in call2_args[2]
+
+    def test_short_video_is_not_split(self, mock_writer, sample_video_metadata):
+        """Test that a short video is not split."""
+        with patch.object(mock_writer, '_api_call_with_retry') as mock_retry:
+            mock_retry.return_value = "Short video summary"
+
+            result = mock_writer.generate_summary(
+                video_url="https://youtube.com/watch?v=short_id",
+                video_metadata=sample_video_metadata # duration is 0 by default
+            )
+
+            assert result == "Short video summary"
+            mock_retry.assert_called_once()

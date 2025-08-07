@@ -64,6 +64,9 @@ class TestYouTubeDataAPI:
                     'channelTitle': 'RickAstleyVEVO',
                     'description': 'The official video for "Never Gonna Give You Up"',
                     'publishedAt': '2009-10-25T06:57:33Z'
+                },
+                'contentDetails': {
+                    'duration': 'PT3M33S'
                 }
             }]
         }
@@ -74,7 +77,7 @@ class TestYouTubeDataAPI:
         # Verify API was called correctly
         mock_build.assert_called_once_with('youtube', 'v3', developerKey='test_youtube_key')
         mock_videos.list.assert_called_once_with(
-            part='snippet',
+            part='snippet,contentDetails',
             id=self.test_video_id
         )
         
@@ -84,7 +87,8 @@ class TestYouTubeDataAPI:
             'channel': 'RickAstleyVEVO',
             'description': 'The official video for "Never Gonna Give You Up"',
             'published_at': '2009-10-25T06:57:33Z',
-            'thumbnail_url': f'https://img.youtube.com/vi/{self.test_video_id}/maxresdefault.jpg'
+            'thumbnail_url': f'https://img.youtube.com/vi/{self.test_video_id}/maxresdefault.jpg',
+            'duration': 213
         }
         assert result == expected
     
@@ -187,7 +191,16 @@ class TestWebScraping:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '''
-        {"title":"Rick Astley - Never Gonna Give You Up (Official Video)","ownerChannelName":"RickAstleyVEVO"}
+        <html>
+        <head>
+            <meta itemprop="duration" content="PT3M33S">
+        </head>
+        <body>
+            <script>
+            var ytInitialData = {"title":"Rick Astley - Never Gonna Give You Up (Official Video)","ownerChannelName":"RickAstleyVEVO"};
+            </script>
+        </body>
+        </html>
         '''
         mock_get.return_value = mock_response
         
@@ -208,10 +221,12 @@ class TestWebScraping:
         assert 'description' in result
         assert 'published_at' in result
         assert 'thumbnail_url' in result
+        assert 'duration' in result
         
         # Verify extracted content
         assert result['title'] == "Rick Astley - Never Gonna Give You Up (Official Video)"
         assert result['channel'] == "RickAstleyVEVO"
+        assert result['duration'] == 213
         
         # Verify thumbnail URL is constructed correctly
         expected_thumbnail = f'https://img.youtube.com/vi/{self.test_video_id}/maxresdefault.jpg'
@@ -388,6 +403,9 @@ class TestUnicodeEncoding:
                     'channelTitle': 'Unicode Channel',
                     'description': 'Description with émojis and açcénts',
                     'publishedAt': '2023-01-01T00:00:00Z'
+                },
+                'contentDetails': {
+                    'duration': 'PT1S'
                 }
             }]
         }
@@ -399,6 +417,7 @@ class TestUnicodeEncoding:
         assert "🎵" in result['title']
         assert "émojis" in result['description']
         assert "açcénts" in result['description']
+        assert result['duration'] == 1
     
     @patch('src.youtube_notion.extractors.video_metadata_extractor.requests.get')
     def test_web_scraping_channel_name_encoding(self, mock_get):

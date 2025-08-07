@@ -63,6 +63,41 @@ class ChatLogger:
             f.write(log_content)
         
         return str(filepath)
+
+    def log_chat_chunk(self, video_id: str, video_url: str, prompt: str,
+                       response: str, video_metadata: Optional[Dict[str, Any]] = None,
+                       chunk_index: int = 0, start_offset: int = 0, end_offset: int = 0) -> str:
+        """
+        Log a chat conversation for a video chunk to a markdown file.
+
+        Args:
+            video_id: YouTube video ID
+            video_url: Full YouTube URL
+            prompt: The prompt sent to Gemini for the chunk
+            response: The response received from Gemini for the chunk
+            video_metadata: Optional video metadata
+            chunk_index: Index of the video chunk
+            start_offset: Start time of the chunk in seconds
+            end_offset: End time of the chunk in seconds
+
+        Returns:
+            str: Path to the created log file
+        """
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{video_id}_chunk_{chunk_index}_{timestamp}.md"
+        filepath = self.log_directory / filename
+
+        # Prepare log content
+        log_content = self._format_chunk_log_content(
+            video_id, video_url, prompt, response, video_metadata, timestamp,
+            chunk_index, start_offset, end_offset
+        )
+
+        # Write log file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(log_content)
+
+        return str(filepath)
     
     def _format_log_content(self, video_id: str, video_url: str, prompt: str,
                            response: str, video_metadata: Optional[Dict[str, Any]],
@@ -102,6 +137,51 @@ class ChatLogger:
 - **Thumbnail**: {video_metadata.get('thumbnail_url', 'N/A')}
 """
         
+        content += f"""
+## Conversation
+
+### User Prompt
+```
+{prompt}
+```
+
+### Gemini Response
+{response}
+
+---
+*Log generated automatically by YouTube-Notion Integration*
+"""
+
+        return content
+
+    def _format_chunk_log_content(self, video_id: str, video_url: str, prompt: str,
+                                 response: str, video_metadata: Optional[Dict[str, Any]],
+                                 timestamp: str, chunk_index: int, start_offset: int, end_offset: int) -> str:
+        """
+        Format the chat log content for a video chunk as markdown.
+        """
+        display_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        content = f"""# Gemini Chat Log (Chunk)
+
+## Session Information
+- **Timestamp**: {display_timestamp}
+- **Video ID**: {video_id}
+- **Video URL**: {video_url}
+
+## Chunk Information
+- **Chunk Index**: {chunk_index}
+- **Start Offset**: {start_offset}s
+- **End Offset**: {end_offset}s
+"""
+
+        if video_metadata:
+            content += f"""
+## Video Metadata
+- **Title**: {video_metadata.get('title', 'Unknown')}
+- **Channel**: {video_metadata.get('channel', 'Unknown')}
+"""
+
         content += f"""
 ## Conversation
 
