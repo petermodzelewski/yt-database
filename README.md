@@ -6,6 +6,7 @@ A Python application that automatically processes YouTube videos and adds AI-gen
 
 - 🎥 **Dynamic YouTube Processing**: Process any YouTube video URL with AI-generated summaries
 - 🤖 **Google Gemini Integration**: Uses Google Gemini AI to generate intelligent video summaries
+- ⏱️ **Long Video Processing**: Automatically splits videos >45 minutes into overlapping chunks for comprehensive analysis
 - 📺 **Embedded Videos**: Automatically embeds YouTube videos at the top of each page
 - ⏰ **Smart Timestamps**: Converts timestamps like `[8:05]` or `[8:05-8:24]` to clickable YouTube links
 - 📝 **Markdown to Notion**: Converts markdown summaries to Notion's rich text format
@@ -15,7 +16,7 @@ A Python application that automatically processes YouTube videos and adds AI-gen
 - 🛡️ **Robust Error Handling**: Comprehensive error handling with retry logic and graceful fallbacks
 - ⚡ **Intelligent Quota Management**: Automatically handles API quota limits with smart retry delays
 - 🔄 **Batch Processing**: Process multiple URLs with resilient error handling
-- 🧪 **Comprehensive Testing**: 491 unit tests ensuring reliable functionality
+- 🧪 **Comprehensive Testing**: 513 unit tests ensuring reliable functionality
 - 📁 **Component-Based Architecture**: Clean, maintainable codebase with dependency injection
 
 ## Architecture
@@ -53,9 +54,10 @@ youtube-notion-integration/
 │       └── utils/               # Shared utilities
 │           ├── exceptions.py    # Exception hierarchy
 │           ├── chat_logger.py   # Conversation logging
+│           ├── video_utils.py   # Video processing utilities
 │           └── markdown_converter.py
 ├── tests/                       # Comprehensive test suite
-│   ├── unit/                    # Fast, isolated tests (491 tests, ~18s)
+│   ├── unit/                    # Fast, isolated tests (513 tests, ~18s)
 │   ├── integration/             # End-to-end tests (13 tests, ~90s)
 │   └── fixtures/                # Test data and mocks
 ├── youtube_notion_cli.py        # Command-line entry point
@@ -444,6 +446,86 @@ Use timestamps in the format [MM:SS] or [MM:SS-MM:SS] for time ranges.
 
 You can override this by setting `DEFAULT_SUMMARY_PROMPT` in your `.env` file.
 
+## Long Video Processing
+
+The application automatically handles videos longer than 45 minutes by intelligently splitting them into overlapping chunks for comprehensive analysis.
+
+### How It Works
+
+**Automatic Detection**: Videos longer than 45 minutes (`MAX_VIDEO_DURATION_SECONDS = 2700`) are automatically detected and processed using the chunked approach.
+
+**Smart Chunking Algorithm**:
+- **Chunk Size**: 45-minute maximum chunks with 5-minute overlaps
+- **Minimum Chunk**: 20-minute minimum to prevent very short final chunks
+- **Overlap Strategy**: Each chunk overlaps with the previous one to maintain context continuity
+
+**Contextual Processing**:
+- **First Chunk**: Processed with the standard prompt
+- **Subsequent Chunks**: Include context from previous summaries to build comprehensive understanding
+- **Cumulative Summary**: Final result combines all chunk summaries into a cohesive document
+
+### Example Processing Flow
+
+```bash
+# Processing a 2-hour educational video
+python youtube_notion_cli.py --url "https://youtu.be/long-educational-video"
+
+# Output:
+Processing video chunk 1/3: 0s - 2700s
+✓ Generated summary for chunk 1
+
+Processing video chunk 2/3: 2400s - 5100s  
+✓ Generated summary for chunk 2 (with context from chunk 1)
+
+Processing video chunk 3/3: 4800s - 7200s
+✓ Generated summary for chunk 3 (with context from chunks 1-2)
+
+✓ Combined all chunks into comprehensive summary
+✓ Added to Notion: Long Educational Video Title
+```
+
+### Technical Implementation
+
+**Duration Extraction**:
+- **YouTube API**: Parses ISO 8601 duration format (`PT1H2M3S`)
+- **Web Scraping Fallback**: Extracts duration from HTML meta tags
+- **Graceful Handling**: Defaults to 0 if duration unavailable
+
+**Gemini API Integration**:
+- **Video Metadata**: Uses `start_offset` and `end_offset` parameters for precise chunk processing
+- **FileData Approach**: Maintains existing FileData pattern for video URLs
+- **Retry Logic**: Preserves all existing error handling and quota management
+
+**Chat Logging**:
+- **Chunk-Specific Logs**: Separate log files for each chunk with timing information
+- **Full Video Log**: Combined log showing the complete processing workflow
+- **Debugging Support**: Detailed logs help troubleshoot long video processing
+
+### Benefits
+
+- **No Manual Intervention**: Completely automatic - just provide the URL
+- **Comprehensive Coverage**: Overlapping chunks ensure no content is missed
+- **Context Preservation**: Each chunk builds on previous summaries for coherent results
+- **Scalable**: Handles videos of any length (tested with 3+ hour content)
+- **Reliable**: Same error handling and retry logic as standard processing
+
+### Use Cases
+
+**Educational Content**:
+- University lectures and courses
+- Conference presentations and workshops
+- Technical deep-dives and tutorials
+
+**Professional Content**:
+- All-hands meetings and town halls
+- Training sessions and webinars
+- Podcast episodes and interviews
+
+**Research & Documentation**:
+- Academic presentations
+- Expert interviews and panels
+- Documentary content analysis
+
 ## Batch Processing
 
 The application supports processing multiple YouTube URLs in a single command, making it easy to batch process educational content, meeting recordings, or entire playlists.
@@ -784,7 +866,7 @@ The project includes comprehensive unit and integration test suites to ensure re
 ### Testing Strategy
 
 **PRIMARY: Unit Tests** (`python run_tests.py`)
-- **Purpose**: Fast feedback during development (491 tests in ~18 seconds)
+- **Purpose**: Fast feedback during development (513 tests in ~18 seconds)
 - **Scope**: Individual component testing with dependency injection
 - **Isolation**: Mock implementations from `tests/fixtures/mock_implementations.py`
 - **No External Dependencies**: No I/O, APIs, or file system operations
