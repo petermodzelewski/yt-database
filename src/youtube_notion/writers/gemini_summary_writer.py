@@ -169,6 +169,23 @@ class GeminiSummaryWriter(SummaryWriter):
                 start_offset=f"{start}s",
                 end_offset=f"{end}s"
             )
+
+            # Log the chat for the current chunk
+            try:
+                video_id = video_metadata.get('video_id', 'unknown')
+                self.chat_logger.log_chat_chunk(
+                    video_id=video_id,
+                    video_url=video_url,
+                    prompt=chunk_prompt,
+                    response=summary_part,
+                    video_metadata=video_metadata,
+                    chunk_index=i,
+                    start_offset=start,
+                    end_offset=end
+                )
+            except Exception as e:
+                print(f"Warning: Failed to log chat conversation for chunk {i}: {e}")
+
             full_summary += "\n" + summary_part if full_summary else summary_part
 
         return full_summary
