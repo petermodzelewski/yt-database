@@ -64,6 +64,9 @@ class TestYouTubeDataAPI:
                     'channelTitle': 'RickAstleyVEVO',
                     'description': 'The official video for "Never Gonna Give You Up"',
                     'publishedAt': '2009-10-25T06:57:33Z'
+                },
+                'contentDetails': {
+                    'duration': 'PT3M32S'
                 }
             }]
         }
@@ -74,7 +77,7 @@ class TestYouTubeDataAPI:
         # Verify API was called correctly
         mock_build.assert_called_once_with('youtube', 'v3', developerKey='test_youtube_key')
         mock_videos.list.assert_called_once_with(
-            part='snippet',
+            part='snippet,contentDetails',
             id=self.test_video_id
         )
         
@@ -84,7 +87,8 @@ class TestYouTubeDataAPI:
             'channel': 'RickAstleyVEVO',
             'description': 'The official video for "Never Gonna Give You Up"',
             'published_at': '2009-10-25T06:57:33Z',
-            'thumbnail_url': f'https://img.youtube.com/vi/{self.test_video_id}/maxresdefault.jpg'
+            'thumbnail_url': f'https://img.youtube.com/vi/{self.test_video_id}/maxresdefault.jpg',
+            'duration': 212
         }
         assert result == expected
     

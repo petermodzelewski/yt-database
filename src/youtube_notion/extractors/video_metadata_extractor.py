@@ -21,6 +21,7 @@ from ..utils.exceptions import (
     MetadataExtractionError,
     ConfigurationError
 )
+from ..utils.video_utils import parse_iso8601_duration
 
 
 class VideoMetadataExtractor:
@@ -346,7 +347,7 @@ class VideoMetadataExtractor:
             
             # Request video details
             request = youtube.videos().list(
-                part='snippet',
+                part='snippet,contentDetails',
                 id=video_id
             )
             
@@ -361,14 +362,21 @@ class VideoMetadataExtractor:
                 )
             
             # Extract video information
-            video_info = response['items'][0]['snippet']
+            video_item = response['items'][0]
+            video_info = video_item['snippet']
+            content_details = video_item.get('contentDetails', {})
+
+            # Extract and parse duration
+            duration_iso = content_details.get('duration')
+            duration_seconds = parse_iso8601_duration(duration_iso) if duration_iso else 0
             
             return {
                 'title': video_info.get('title', 'Unknown Title'),
                 'channel': video_info.get('channelTitle', 'Unknown Channel'),
                 'description': video_info.get('description', ''),
                 'published_at': video_info.get('publishedAt', ''),
-                'thumbnail_url': self._construct_thumbnail_url(video_id)
+                'thumbnail_url': self._construct_thumbnail_url(video_id),
+                'duration': duration_seconds
             }
             
         except VideoUnavailableError:
@@ -505,7 +513,8 @@ class VideoMetadataExtractor:
                 'channel': channel,
                 'description': '',  # Not easily extractable via scraping
                 'published_at': '',  # Not easily extractable via scraping
-                'thumbnail_url': self._construct_thumbnail_url(video_id)
+                'thumbnail_url': self._construct_thumbnail_url(video_id),
+                'duration': 0
             }
             
         except VideoUnavailableError:

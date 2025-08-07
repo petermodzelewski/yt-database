@@ -22,7 +22,8 @@ from ..utils.exceptions import (
     APIError,
     QuotaExceededError
 )
-from ..config.constants import DEFAULT_SUMMARY_PROMPT
+from ..config.constants import DEFAULT_SUMMARY_PROMPT, MAX_VIDEO_DURATION_SECONDS
+from ..utils.video_utils import calculate_video_splits
 
 
 class GeminiSummaryWriter(SummaryWriter):
@@ -81,8 +82,8 @@ class GeminiSummaryWriter(SummaryWriter):
         # Initialize chat logger
         self.chat_logger = chat_logger or ChatLogger()
     
-    def generate_summary(self, video_url: str, video_metadata: Dict[str, Any], 
-                        custom_prompt: Optional[str] = None) -> str:
+    def generate_summary(self, video_url: str, video_metadata: Dict[str, Any],
+                         custom_prompt: Optional[str] = None) -> str:
         """
         Generate a markdown summary for the video using Gemini AI.
         
@@ -100,16 +101,19 @@ class GeminiSummaryWriter(SummaryWriter):
         """
         if not video_url:
             raise SummaryGenerationError("Video URL is required")
-        
+
         if not video_metadata:
             raise SummaryGenerationError("Video metadata is required")
-        
+
         prompt = custom_prompt or self.default_prompt
-        
+        duration_seconds = video_metadata.get('duration', 0)
+
         try:
-            # Generate summary with retry logic
-            response = self._api_call_with_retry(self._call_gemini_api, video_url, prompt)
-            
+            if duration_seconds > MAX_VIDEO_DURATION_SECONDS:
+                response = self._generate_summary_for_long_video(video_url, video_metadata, prompt)
+            else:
+                response = self._api_call_with_retry(self._call_gemini_api, video_url, prompt)
+
             # Log the chat conversation
             try:
                 video_id = video_metadata.get('video_id', 'unknown')
@@ -123,9 +127,9 @@ class GeminiSummaryWriter(SummaryWriter):
             except Exception as e:
                 # Don't fail the main process if logging fails
                 print(f"Warning: Failed to log chat conversation: {e}")
-            
+
             return response
-            
+
         except (APIError, QuotaExceededError):
             # Re-raise known API errors as SummaryGenerationError
             raise
@@ -135,6 +139,39 @@ class GeminiSummaryWriter(SummaryWriter):
                 f"Unexpected error during summary generation: {str(e)}",
                 details=f"Video URL: {video_url}, Error type: {type(e).__name__}"
             )
+
+    def _generate_summary_for_long_video(self, video_url: str, video_metadata: Dict[str, Any], prompt: str) -> str:
+        """
+        Generate a summary for a long video by splitting it into chunks and processing them sequentially.
+        """
+        duration_seconds = video_metadata.get('duration', 0)
+        splits = calculate_video_splits(duration_seconds)
+
+        full_summary = ""
+        for i, (start, end) in enumerate(splits):
+            print(f"Processing video chunk {i+1}/{len(splits)}: {start}s - {end}s")
+
+            if i == 0:
+                chunk_prompt = f"This is the first part of a video. {prompt}"
+            else:
+                chunk_prompt = (
+                    f"This is part {i+1} of {len(splits)} of a video, starting from timestamp {start}s.\n"
+                    f"The summary from the previous part is:\n<summary>{full_summary}</summary>\n"
+                    f"Your task is to write a summary for the second part with timestamps according to the instructions.\n"
+                    f"<instruction>{prompt}</instruction>\n"
+                    f"<important>Return only the continuation of the summary, don't duplicate content from parts already in the previous summary.</important>"
+                )
+
+            summary_part = self._api_call_with_retry(
+                self._call_gemini_api,
+                video_url,
+                chunk_prompt,
+                start_offset=f"{start}s",
+                end_offset=f"{end}s"
+            )
+            full_summary += "\n" + summary_part if full_summary else summary_part
+
+        return full_summary
     
     def validate_configuration(self) -> bool:
         """
@@ -181,13 +218,16 @@ class GeminiSummaryWriter(SummaryWriter):
                 f"Configuration validation failed: {str(e)}"
             )
     
-    def _call_gemini_api(self, video_url: str, prompt: str) -> str:
+    def _call_gemini_api(self, video_url: str, prompt: str,
+                         start_offset: Optional[str] = None, end_offset: Optional[str] = None) -> str:
         """
         Make the actual Gemini API call with streaming response handling.
         
         Args:
             video_url: YouTube URL for Gemini to process
             prompt: Prompt for summary generation
+            start_offset: Start offset for video chunk
+            end_offset: End offset for video chunk
             
         Returns:
             str: AI-generated markdown summary with timestamps
@@ -200,19 +240,24 @@ class GeminiSummaryWriter(SummaryWriter):
             # Initialize Gemini client
             client = genai.Client(api_key=self.api_key)
             
+            # Prepare video part
+            video_part = types.Part(
+                file_data=types.FileData(
+                    file_uri=video_url,
+                    mime_type="video/*"
+                )
+            )
+            if start_offset and end_offset:
+                video_part.video_metadata = types.VideoMetadata(
+                    start_offset=start_offset,
+                    end_offset=end_offset
+                )
+
             # Prepare content for the API call
             contents = [
                 types.Content(
                     role="user",
-                    parts=[
-                        types.Part(
-                            file_data=types.FileData(
-                                file_uri=video_url,
-                                mime_type="video/*"
-                            )
-                        ),
-                        types.Part.from_text(text=prompt)
-                    ]
+                    parts=[video_part, types.Part.from_text(text=prompt)]
                 )
             ]
             
@@ -312,6 +357,27 @@ class GeminiSummaryWriter(SummaryWriter):
                 api_name="Gemini API",
                 details=f"Video URL: {video_url}, Error type: {error_type}, Model: {self.model}"
             )
+
+    def _call_gemini_api_for_text(self, prompt: str) -> str:
+        """
+        Make a Gemini API call for text-only input.
+        """
+        try:
+            client = genai.Client(api_key=self.api_key)
+            contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+            generate_content_config = types.GenerateContentConfig(
+                temperature=self.temperature,
+                max_output_tokens=self.max_output_tokens,
+                response_mime_type="text/plain"
+            )
+            response = client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=generate_content_config
+            )
+            return response.text.strip() if response.text else ""
+        except Exception as e:
+            raise APIError(f"Gemini API text call failed: {str(e)}", api_name="Gemini API")
     
     def _api_call_with_retry(self, api_func, *args, **kwargs):
         """

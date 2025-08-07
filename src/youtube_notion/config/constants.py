@@ -13,3 +13,6 @@ Put timestamp(s) to fragments of the video next to each fact you got from the vi
 Format the output in markdown with proper headers, bullet points, and formatting.
 Use timestamps in the format [MM:SS] or [MM:SS-MM:SS] for time ranges.
 """
+
+# Maximum video duration in seconds that can be processed in a single chunk
+MAX_VIDEO_DURATION_SECONDS = 2700  # 45 minutes

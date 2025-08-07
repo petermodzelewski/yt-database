@@ -176,6 +176,9 @@ class TestVideoMetadataExtractor:
                     'channelTitle': 'Test Channel',
                     'description': 'Test description',
                     'publishedAt': '2023-01-01T00:00:00Z'
+                },
+                'contentDetails': {
+                    'duration': 'PT1H2M3S'
                 }
             }]
         }
@@ -190,7 +193,8 @@ class TestVideoMetadataExtractor:
             'description': 'Test description',
             'published_at': '2023-01-01T00:00:00Z',
             'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-            'video_id': 'dQw4w9WgXcQ'
+            'video_id': 'dQw4w9WgXcQ',
+            'duration': 3723
         }
         
         assert result == expected
@@ -293,7 +297,8 @@ class TestVideoMetadataExtractor:
             'description': '',
             'published_at': '',
             'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-            'video_id': 'dQw4w9WgXcQ'
+            'video_id': 'dQw4w9WgXcQ',
+            'duration': 0
         }
         
         assert result == expected
