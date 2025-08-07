@@ -31,9 +31,10 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 ### AI Summary Requirements
 - Use `GeminiSummaryWriter` for structured summaries
 - **CRITICAL**: Pass YouTube URLs as FileData to Gemini API (not text prompts)
+- **Long Video Processing**: Automatically split videos >45 minutes into overlapping chunks
 - Support streaming responses with progress indicators
 - Handle markdown: headers (H1-H3), lists, bold, italic, **nested formatting in tables**
-- Automatic conversation logging to `chat_logs/` directory
+- Automatic conversation logging to `chat_logs/` directory (including chunk-specific logs)
 
 ### Advanced Markdown Processing
 - **Table Support**: Full table parsing with nested formatting (bold, italic, links)
@@ -47,6 +48,13 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - Parse API `retryDelay` responses and wait appropriately
 - Cap retry delays to 5 seconds during testing
 - Use concise output in batch mode
+
+### Long Video Processing
+- **Automatic Detection**: Videos >45 minutes (`MAX_VIDEO_DURATION_SECONDS = 2700`) are automatically split
+- **Smart Chunking**: 45-minute chunks with 5-minute overlaps, 20-minute minimum chunks
+- **Contextual Processing**: Each chunk receives context from previous summaries
+- **Progress Tracking**: Clear indication of chunk processing ("Processing chunk 2/4...")
+- **Duration Extraction**: Parse video duration from YouTube API and web scraping fallback
 
 ## Quality Standards
 
@@ -67,5 +75,6 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - **CRITICAL**: Implement block batching for summaries >100 blocks
 - Automatically discover target databases by name
 - Check for duplicates before creating pages
-- Map video metadata to Notion page properties
+- Map video metadata to Notion page properties (including duration)
 - Handle Notion's 100-block limit with automatic batching (first 100 blocks + append remaining)
+- Support long-form content from chunked video processing

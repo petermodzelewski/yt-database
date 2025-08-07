@@ -13,6 +13,7 @@ inclusion: always
 - `google-genai>=0.1.0` - Google Gemini AI integration with FileData support
 - `google-api-python-client>=2.0.0` - YouTube Data API access
 - `requests>=2.25.0` - HTTP requests and web scraping fallback
+- `beautifulsoup4` - Enhanced HTML parsing for metadata extraction
 - `pytest` - Primary testing framework (unified across all tests)
 - `hypothesis` - Property-based testing for robust validation
 
@@ -68,6 +69,9 @@ from notion_client import Client
 ### Gemini API Best Practices
 - **CRITICAL**: Use `types.Part(file_data=...)` for YouTube URLs, not text prompts
 - Pass video URLs as FileData objects to align with Gemini documentation
+- **Long Video Processing**: Videos >45 minutes automatically split into overlapping chunks
+- Use `start_offset` and `end_offset` parameters for precise chunk processing
+- Build cumulative summaries by passing previous parts as context
 - This ensures reliable video processing and proper API usage
 
 ### Notion API Optimization
@@ -94,15 +98,23 @@ from notion_client import Client
 - **Notion Batching**: Automatic handling of 100+ block summaries with batching
 - **Nested Table Formatting**: Rich markdown support within table cells
 
+### Long Video Processing (Latest)
+- **Automatic Video Splitting**: Videos >45 minutes split into overlapping chunks
+- **Duration Extraction**: Parse ISO 8601 duration from YouTube API and web scraping
+- **Chunked Processing**: Sequential processing with contextual prompts
+- **Enhanced Chat Logging**: Separate logs for each video chunk with timing info
+
 ### Testing Enhancements
 - **Property-Based Testing**: Added Hypothesis for robust markdown validation
 - **Unified pytest**: All tests now use pytest framework consistently
 - **Enhanced Coverage**: 478 unit tests with comprehensive edge case testing
+- **Video Utils Testing**: Comprehensive tests for duration parsing and video splitting
 
 ### Code Quality Improvements
 - **Consolidated Processing**: Streamlined main.py logic (reduced by 184 lines)
 - **Better Error Handling**: Enhanced API integration with proper fallbacks
 - **Rich Content Support**: Tables with nested bold, italic, links formatting
+- **Modular Video Utils**: Extracted video processing utilities to separate module
 
 ## Development Commands
 
