@@ -15,7 +15,7 @@ A Python application that automatically processes YouTube videos and adds AI-gen
 - 🛡️ **Robust Error Handling**: Comprehensive error handling with retry logic and graceful fallbacks
 - ⚡ **Intelligent Quota Management**: Automatically handles API quota limits with smart retry delays
 - 🔄 **Batch Processing**: Process multiple URLs with resilient error handling
-- 🧪 **Comprehensive Testing**: 478+ unit tests ensuring reliable functionality
+- 🧪 **Comprehensive Testing**: 491 unit tests ensuring reliable functionality
 - 📁 **Component-Based Architecture**: Clean, maintainable codebase with dependency injection
 
 ## Architecture
@@ -55,7 +55,7 @@ youtube-notion-integration/
 │           ├── chat_logger.py   # Conversation logging
 │           └── markdown_converter.py
 ├── tests/                       # Comprehensive test suite
-│   ├── unit/                    # Fast, isolated tests (478 tests, ~6s)
+│   ├── unit/                    # Fast, isolated tests (491 tests, ~18s)
 │   ├── integration/             # End-to-end tests (13 tests, ~90s)
 │   └── fixtures/                # Test data and mocks
 ├── youtube_notion_cli.py        # Command-line entry point
@@ -784,7 +784,7 @@ The project includes comprehensive unit and integration test suites to ensure re
 ### Testing Strategy
 
 **PRIMARY: Unit Tests** (`python run_tests.py`)
-- **Purpose**: Fast feedback during development (478 tests in ~6 seconds)
+- **Purpose**: Fast feedback during development (491 tests in ~18 seconds)
 - **Scope**: Individual component testing with dependency injection
 - **Isolation**: Mock implementations from `tests/fixtures/mock_implementations.py`
 - **No External Dependencies**: No I/O, APIs, or file system operations
@@ -961,7 +961,7 @@ cp .env.example .env
 
 **Testing** (primary development workflow):
 ```bash
-python run_tests.py                    # Unit tests (fast, ~6 seconds)
+python run_tests.py                    # Unit tests (fast, ~18 seconds)
 python -m pytest tests/integration/   # Integration tests (slow, ~90 seconds)
 ```
 
@@ -1022,9 +1022,13 @@ Becomes:
 ### Package Structure
 
 - `src/youtube_notion/main.py` - Application entry point
-- `src/youtube_notion/notion_db/operations.py` - Database operations (find, create entries)
+- `src/youtube_notion/storage/notion_storage.py` - Notion database operations
+- `src/youtube_notion/writers/gemini_summary_writer.py` - AI summary generation
+- `src/youtube_notion/extractors/video_metadata_extractor.py` - YouTube metadata extraction
+- `src/youtube_notion/processors/video_processor.py` - Main orchestration logic
 - `src/youtube_notion/utils/markdown_converter.py` - Markdown to Notion conversion
 - `src/youtube_notion/config/example_data.py` - Sample data for testing
+- `src/youtube_notion/config/factory.py` - Component dependency injection
 - `tests/` - Unit and integration tests
 - `youtube_notion_cli.py` - Command-line interface script
 
