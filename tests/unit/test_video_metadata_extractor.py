@@ -8,7 +8,7 @@ both API and web scraping approaches.
 
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, PropertyMock
 from googleapiclient.errors import HttpError
 from src.youtube_notion.extractors.video_metadata_extractor import VideoMetadataExtractor
 from src.youtube_notion.utils.exceptions import (
@@ -199,6 +199,10 @@ class TestVideoMetadataExtractor:
         
         assert result == expected
         mock_build.assert_called_once_with('youtube', 'v3', developerKey='test_api_key')
+        mock_youtube.videos.return_value.list.assert_called_once_with(
+            part='snippet,contentDetails',
+            id='dQw4w9WgXcQ'
+        )
     
     @patch('src.youtube_notion.extractors.video_metadata_extractor.build')
     def test_extract_metadata_via_api_video_not_found(self, mock_build):
@@ -281,9 +285,14 @@ class TestVideoMetadataExtractor:
         mock_response = Mock()
         mock_response.text = '''
         <html>
-        <script>
-        var ytInitialData = {"title":"Test Video Title","ownerChannelName":"Test Channel"};
-        </script>
+        <head>
+            <meta itemprop="duration" content="PT3M34S">
+        </head>
+        <body>
+            <script>
+            var ytInitialData = {"title":"Test Video Title","ownerChannelName":"Test Channel"};
+            </script>
+        </body>
         </html>
         '''
         mock_response.raise_for_status.return_value = None
@@ -298,11 +307,51 @@ class TestVideoMetadataExtractor:
             'published_at': '',
             'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
             'video_id': 'dQw4w9WgXcQ',
-            'duration': 0
+            'duration': 214
         }
         
         assert result == expected
-        mock_get.assert_called_once()
+        mock_get.assert_called_once_with(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'},
+            timeout=10
+        )
+
+    @patch('requests.get')
+    def test_extract_metadata_via_scraping_no_duration(self, mock_get):
+        """Test successful metadata extraction via web scraping when duration is missing."""
+        # Mock successful HTTP response
+        mock_response = Mock()
+        mock_response.text = '''
+        <html>
+        <body>
+            <script>
+            var ytInitialData = {"title":"Test Video Title","ownerChannelName":"Test Channel"};
+            </script>
+        </body>
+        </html>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        result = self.extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+        expected = {
+            'title': 'Test Video Title',
+            'channel': 'Test Channel',
+            'description': '',
+            'published_at': '',
+            'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+            'video_id': 'dQw4w9WgXcQ',
+            'duration': 0
+        }
+
+        assert result == expected
+        mock_get.assert_called_once_with(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'},
+            timeout=10
+        )
     
     @patch('requests.get')
     def test_extract_metadata_via_scraping_video_unavailable(self, mock_get):
@@ -417,6 +466,35 @@ class TestVideoMetadataExtractor:
             mock_scraping.assert_called_once_with("dQw4w9WgXcQ")
 
 
+    @patch('src.youtube_notion.extractors.video_metadata_extractor.build')
+    def test_missing_metadata_fields_in_api_response(self, mock_build):
+        """Test handling of missing fields in API response."""
+        mock_youtube = Mock()
+        mock_build.return_value = mock_youtube
+
+        mock_request = Mock()
+        mock_youtube.videos.return_value.list.return_value = mock_request
+
+        # Response with missing fields
+        mock_response = {
+            'items': [{
+                'snippet': {
+                    # Missing title, channelTitle, etc.
+                }
+            }]
+        }
+        mock_request.execute.return_value = mock_response
+
+        extractor = VideoMetadataExtractor(youtube_api_key="test_key")
+        result = extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+        # Should use default values for missing fields
+        assert result['title'] == 'Unknown Title'
+        assert result['channel'] == 'Unknown Channel'
+        assert result['description'] == ''
+        assert result['published_at'] == ''
+        assert result['duration'] == 0
+
 class TestVideoMetadataExtractorEdgeCases:
     """Test edge cases and error scenarios."""
     
@@ -424,68 +502,40 @@ class TestVideoMetadataExtractorEdgeCases:
         """Set up test fixtures."""
         self.extractor = VideoMetadataExtractor()
     
-    def test_unicode_handling_in_scraping(self):
+    @patch('requests.get')
+    def test_unicode_handling_in_scraping(self, mock_get):
         """Test proper handling of unicode characters in scraped content."""
-        with patch('requests.get') as mock_get:
-            mock_response = Mock()
-            # Test with JSON-escaped unicode
-            mock_response.text = '''
-            <script>
-            var data = {"title":"Test \\u2013 Video","ownerChannelName":"Test \\u00a9 Channel"};
-            </script>
-            '''
-            mock_response.raise_for_status.return_value = None
-            mock_get.return_value = mock_response
-            
-            result = self.extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-            
-            # The JSON decoder should properly handle unicode escapes
-            assert 'Test' in result['title']
-            assert 'Channel' in result['channel']
+        mock_response = Mock()
+        # Test with JSON-escaped unicode
+        mock_response.text = '''
+        <script>
+        var data = {"title":"Test \\u2013 Video","ownerChannelName":"Test \\u00a9 Channel"};
+        </script>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        result = self.extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+        # The JSON decoder should properly handle unicode escapes
+        assert 'Test' in result['title']
+        assert 'Channel' in result['channel']
     
-    def test_missing_metadata_fields_in_api_response(self):
-        """Test handling of missing fields in API response."""
-        with patch('src.youtube_notion.extractors.video_metadata_extractor.build') as mock_build:
-            mock_youtube = Mock()
-            mock_build.return_value = mock_youtube
-            
-            mock_request = Mock()
-            mock_youtube.videos.return_value.list.return_value = mock_request
-            
-            # Response with missing fields
-            mock_response = {
-                'items': [{
-                    'snippet': {
-                        # Missing title, channelTitle, etc.
-                    }
-                }]
-            }
-            mock_request.execute.return_value = mock_response
-            
-            extractor = VideoMetadataExtractor(youtube_api_key="test_key")
-            result = extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-            
-            # Should use default values for missing fields
-            assert result['title'] == 'Unknown Title'
-            assert result['channel'] == 'Unknown Channel'
-            assert result['description'] == ''
-            assert result['published_at'] == ''
-    
-    def test_malformed_json_in_scraping(self):
+    @patch('requests.get')
+    def test_malformed_json_in_scraping(self, mock_get):
         """Test handling of malformed JSON during scraping."""
-        with patch('requests.get') as mock_get:
-            mock_response = Mock()
-            # Malformed JSON that can't be decoded
-            mock_response.text = '''
-            <script>
-            var data = {"title":"Test \\uXXXX Video","ownerChannelName":"Test Channel"};
-            </script>
-            '''
-            mock_response.raise_for_status.return_value = None
-            mock_get.return_value = mock_response
-            
-            result = self.extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-            
-            # Should fall back to raw strings when JSON decoding fails
-            assert 'title' in result
-            assert 'channel' in result
+        mock_response = Mock()
+        # Malformed JSON that can't be decoded
+        mock_response.text = '''
+        <script>
+        var data = {"title":"Test \\uXXXX Video","ownerChannelName":"Test Channel"};
+        </script>
+        '''
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        result = self.extractor.extract_metadata("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+        # Should fall back to raw strings when JSON decoding fails
+        assert 'title' in result
+        assert 'channel' in result

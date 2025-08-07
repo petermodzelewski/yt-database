@@ -361,12 +361,9 @@ class VideoMetadataExtractor:
                     details="Video may be private, deleted, or restricted"
                 )
             
-            # Extract video information
             video_item = response['items'][0]
-            video_info = video_item['snippet']
+            video_info = video_item.get('snippet', {})
             content_details = video_item.get('contentDetails', {})
-
-            # Extract and parse duration
             duration_iso = content_details.get('duration')
             duration_seconds = parse_iso8601_duration(duration_iso) if duration_iso else 0
             
@@ -489,6 +486,11 @@ class VideoMetadataExtractor:
                 channel_match = re.search(r'"channelName":"([^"]+)"', html_content)
             channel = channel_match.group(1) if channel_match else "Unknown Channel"
             
+            # Extract duration from meta tag
+            duration_match = re.search(r'<meta itemprop="duration" content="([^"]+)">', html_content)
+            duration_iso = duration_match.group(1) if duration_match else None
+            duration_seconds = parse_iso8601_duration(duration_iso) if duration_iso else 0
+
             # Check if video is available
             if "Video unavailable" in html_content or "This video is not available" in html_content:
                 raise VideoUnavailableError(
@@ -514,7 +516,7 @@ class VideoMetadataExtractor:
                 'description': '',  # Not easily extractable via scraping
                 'published_at': '',  # Not easily extractable via scraping
                 'thumbnail_url': self._construct_thumbnail_url(video_id),
-                'duration': 0
+                'duration': duration_seconds
             }
             
         except VideoUnavailableError:
