@@ -1,0 +1,1 @@
+# Web UI components for YouTube-to-Notion integration
