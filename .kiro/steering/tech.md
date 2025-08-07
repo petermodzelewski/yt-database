@@ -6,7 +6,15 @@ inclusion: always
 
 ## Core Stack & Dependencies
 
-**Python 3.12+** with `notion-client`, `google-genai>=0.1.0`, `python-dotenv`, `pytest`
+**Python 3.12+** with `notion-client`, `google-genai>=0.1.0`, `python-dotenv`, `pytest`, `hypothesis`
+
+### Key Dependencies
+- `notion-client` - Official Notion API client
+- `google-genai>=0.1.0` - Google Gemini AI integration with FileData support
+- `google-api-python-client>=2.0.0` - YouTube Data API access
+- `requests>=2.25.0` - HTTP requests and web scraping fallback
+- `pytest` - Primary testing framework (unified across all tests)
+- `hypothesis` - Property-based testing for robust validation
 
 ## Architecture Rules
 
@@ -57,6 +65,17 @@ from notion_client import Client
 
 ## API Integration
 
+### Gemini API Best Practices
+- **CRITICAL**: Use `types.Part(file_data=...)` for YouTube URLs, not text prompts
+- Pass video URLs as FileData objects to align with Gemini documentation
+- This ensures reliable video processing and proper API usage
+
+### Notion API Optimization
+- **CRITICAL**: Implement block batching for summaries >100 blocks
+- Create pages with first 100 blocks, append remaining in batches of 100
+- Handle Notion's hard limit gracefully to prevent validation errors
+- Test with long summaries to verify batching logic
+
 ### Retry Logic
 - Implement graceful fallbacks (YouTube API → web scraping)
 - Parse API `retryDelay` responses (e.g., "18s") + 15 second buffer
@@ -67,6 +86,23 @@ from notion_client import Client
 - Use `.env` for development, `.env-test` for integration tests
 - Validate configuration at component initialization
 - Support multiple API providers with graceful degradation
+
+## Recent Improvements (Post-PR #3)
+
+### Critical API Fixes
+- **Gemini FileData**: YouTube URLs now passed as FileData objects (not text)
+- **Notion Batching**: Automatic handling of 100+ block summaries with batching
+- **Nested Table Formatting**: Rich markdown support within table cells
+
+### Testing Enhancements
+- **Property-Based Testing**: Added Hypothesis for robust markdown validation
+- **Unified pytest**: All tests now use pytest framework consistently
+- **Enhanced Coverage**: 478 unit tests with comprehensive edge case testing
+
+### Code Quality Improvements
+- **Consolidated Processing**: Streamlined main.py logic (reduced by 184 lines)
+- **Better Error Handling**: Enhanced API integration with proper fallbacks
+- **Rich Content Support**: Tables with nested bold, italic, links formatting
 
 ## Development Commands
 
@@ -82,12 +118,16 @@ python -m pytest tests/integration/   # Integration tests (releases only)
 # Application modes
 python youtube_notion_cli.py --example-data           # Default mode
 python youtube_notion_cli.py --url "VIDEO_URL"        # YouTube mode
-python youtube_notion_cli.py --batch --urls url1 url2 # Batch mode
+python youtube_notion_cli.py --urls "url1,url2,url3"  # Batch mode
+python youtube_notion_cli.py --file urls.txt          # Batch from file
 ```
 
 ## CLI Design
 
 - Dual entry points: `youtube_notion_cli.py` (dev) and console script (installed)
 - Mutually exclusive argument groups for different modes
-- File-based URL input for large batch operations (`--file urls.txt`)
+- **Batch Processing**: 
+  - `--urls "url1,url2,url3"` for comma-separated URLs
+  - `--file urls.txt` for file-based URL input
 - Use `batch_mode` parameter to control output verbosity
+- Custom prompts only supported with single `--url` (not batch modes)

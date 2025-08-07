@@ -15,30 +15,51 @@ A Python application that automatically processes YouTube videos and adds AI-gen
 - 🛡️ **Robust Error Handling**: Comprehensive error handling with retry logic and graceful fallbacks
 - ⚡ **Intelligent Quota Management**: Automatically handles API quota limits with smart retry delays
 - 🔄 **Batch Processing**: Process multiple URLs with resilient error handling
-- 🧪 **Comprehensive Testing**: 50+ unit tests ensuring reliable functionality
-- 📁 **Professional Structure**: Organized, maintainable codebase following Python best practices
+- 🧪 **Comprehensive Testing**: 478+ unit tests ensuring reliable functionality
+- 📁 **Component-Based Architecture**: Clean, maintainable codebase with dependency injection
+
+## Architecture
+
+This project follows a **component-based architecture** with clear separation of concerns:
+
+- **Interfaces First**: All components implement abstract interfaces for testability
+- **Dependency Injection**: Uses `ComponentFactory` for component creation and wiring
+- **Single Responsibility**: Each component has one clear purpose
+- **Comprehensive Testing**: Unit tests with mock implementations for fast feedback
 
 ## Project Structure
 
 ```
 youtube-notion-integration/
 ├── src/
-│   └── youtube_notion/          # Main package
+│   └── youtube_notion/          # Main package (use relative imports)
 │       ├── __init__.py
 │       ├── main.py              # Application entry point
-│       ├── config/              # Configuration and example data
-│       │   ├── __init__.py
+│       ├── interfaces/          # Abstract base classes (contracts)
+│       │   ├── storage.py       # Storage interface
+│       │   └── summary_writer.py # Summary writer interface
+│       ├── extractors/          # Video metadata extraction
+│       │   └── video_metadata_extractor.py
+│       ├── writers/             # AI summary generation
+│       │   └── gemini_summary_writer.py
+│       ├── storage/             # Data persistence
+│       │   └── notion_storage.py
+│       ├── processors/          # Orchestration layer
+│       │   └── video_processor.py # Main orchestrator
+│       ├── config/              # Configuration & DI
+│       │   ├── factory.py       # Component factory
+│       │   ├── settings.py      # Environment config
 │       │   └── example_data.py
-│       ├── notion_db/           # Notion database operations
-│       │   ├── __init__.py
-│       │   └── operations.py
-│       └── utils/               # Utility modules
-│           ├── __init__.py
+│       └── utils/               # Shared utilities
+│           ├── exceptions.py    # Exception hierarchy
+│           ├── chat_logger.py   # Conversation logging
 │           └── markdown_converter.py
 ├── tests/                       # Comprehensive test suite
+│   ├── unit/                    # Fast, isolated tests (478 tests, ~6s)
+│   ├── integration/             # End-to-end tests (13 tests, ~90s)
+│   └── fixtures/                # Test data and mocks
 ├── youtube_notion_cli.py        # Command-line entry point
 ├── pyproject.toml              # Modern Python packaging
-├── setup.py                    # Package setup
 └── requirements.txt            # Dependencies
 ```
 
@@ -58,7 +79,7 @@ youtube-notion-integration/
   ```bash
   git clone <repository-url>
   cd youtube-notion-integration
-  pip install -r requirements.txt
+  pip install -e .
   ```
 
 - [ ] **2. Get API Keys**
@@ -93,7 +114,7 @@ youtube-notion-integration/
 ```bash
 git clone <repository-url>
 cd youtube-notion-integration
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 2. Configure Environment
@@ -187,7 +208,7 @@ python youtube_notion_cli.py --example-data
 | Option | Description | Example |
 |--------|-------------|---------|
 | `--url URL` | Process a single YouTube video URL | `--url "https://youtu.be/abc123"` |
-| `--urls URLS` | Process multiple URLs (comma-separated) | `--urls "https://youtu.be/abc123,https://youtu.be/def456"` |
+| `--urls URLS` | Process multiple URLs (comma-separated) | `--urls "url1,url2,url3"` |
 | `--file FILE` | Process URLs from file (one per line) | `--file urls.txt` |
 | `--example-data` | Use built-in example data (default) | `--example-data` |
 | `--prompt TEXT` | Custom AI prompt (only with single --url) | `--prompt "Summarize key points"` |
@@ -207,7 +228,7 @@ youtube-notion --url "https://www.youtube.com/watch?v=VIDEO_ID"
 python -m youtube_notion.main
 
 # Method 4: Import and use programmatically
-python -c "from src.youtube_notion.main import main; main(youtube_url='https://youtu.be/VIDEO_ID')"
+python -c "from youtube_notion.main import main; main(youtube_url='https://youtu.be/VIDEO_ID')"
 ```
 
 #### Execution Mode Details
@@ -423,7 +444,7 @@ Use timestamps in the format [MM:SS] or [MM:SS-MM:SS] for time ranges.
 
 You can override this by setting `DEFAULT_SUMMARY_PROMPT` in your `.env` file.
 
-## Multi-URL Processing
+## Batch Processing
 
 The application supports processing multiple YouTube URLs in a single command, making it easy to batch process educational content, meeting recordings, or entire playlists.
 
@@ -432,13 +453,13 @@ The application supports processing multiple YouTube URLs in a single command, m
 #### 1. Comma-Separated URLs
 ```bash
 # Process multiple URLs at once
+python youtube_notion_cli.py --urls "url1,url2,url3"
+
+# Example with real URLs
 python youtube_notion_cli.py --urls "https://youtu.be/dQw4w9WgXcQ,https://youtu.be/oHg5SJYRHA0,https://youtu.be/kJQP7kiw5Fk"
 
 # URLs can have spaces around commas (automatically trimmed)
 python youtube_notion_cli.py --urls "https://youtu.be/abc123, https://youtu.be/def456 , https://youtu.be/ghi789"
-
-# Empty entries are automatically ignored
-python youtube_notion_cli.py --urls "https://youtu.be/abc123,,https://youtu.be/def456"
 ```
 
 #### 2. File Input
@@ -760,12 +781,27 @@ The application includes example data from a YouTube video about AI chunking str
 
 The project includes comprehensive unit and integration test suites to ensure reliability and maintainability.
 
+### Testing Strategy
+
+**PRIMARY: Unit Tests** (`python run_tests.py`)
+- **Purpose**: Fast feedback during development (478 tests in ~6 seconds)
+- **Scope**: Individual component testing with dependency injection
+- **Isolation**: Mock implementations from `tests/fixtures/mock_implementations.py`
+- **No External Dependencies**: No I/O, APIs, or file system operations
+- **Coverage**: Test all business logic, error handling, and edge cases
+
+**SECONDARY: Integration Tests** (`python -m pytest tests/integration/`)
+- **Purpose**: End-to-end validation before releases (13 tests in ~90 seconds)
+- **Scope**: Real external APIs with `.env-test` configuration
+- **Environment**: Test database "YT Summaries [TEST]" for safe testing
+- **Coverage**: Full pipeline testing with actual YouTube and Notion APIs
+
 ### Unit Tests
 
 Fast, isolated tests that don't require external APIs:
 
 ```bash
-# Run all unit tests (recommended)
+# Run all unit tests (recommended for daily development)
 python run_tests.py
 
 # Run with pytest directly
@@ -801,16 +837,8 @@ End-to-end tests that verify complete functionality with real APIs:
 
 3. **Run integration tests**:
    ```bash
-   # Run all tests (unit + integration)
-   python run_tests.py
-   
-   # Run only unit tests (fast)
-   python run_tests.py --unit
-   
-   # Run only integration tests (requires API keys)
-   python run_tests.py --integration
-   # OR use the dedicated integration test runner
-   python run_integration_tests.py
+   # Run integration tests only (requires API keys)
+   python -m pytest tests/integration/
    ```
 
 #### Integration Test Features
@@ -829,23 +857,36 @@ End-to-end tests that verify complete functionality with real APIs:
 - **Validates API keys are not placeholders**
 - **Automatic cleanup of test data**
 
-### Test Categories
+### Test Development Rules
 
-- **Unit Tests** (`tests/unit/`): Fast, isolated component tests
-- **Integration Tests** (`tests/integration/`): End-to-end workflow tests
-- **Performance Tests**: Marked with `@pytest.mark.slow`
-- **API Tests**: Tests requiring external service connections
+**Unit Test Requirements**:
+- **MANDATORY**: Write unit tests for every functionality change
+- **ISOLATION**: Use mock implementations, never call external APIs
+- **FAST**: Tests must complete in seconds, not minutes
+- **COMPREHENSIVE**: Cover success paths, error conditions, and edge cases
+- **DEPENDENCY INJECTION**: Test components through their interfaces
+
+**Integration Test Guidelines**:
+- **ENVIRONMENT**: Use `.env-test` configuration exclusively
+- **SAFETY**: Only use designated test databases and resources
+- **CLEANUP**: Tests must clean up any created resources
+- **RESILIENCE**: Handle API rate limits and network issues gracefully
+
+**Testing Workflow**:
+- **DAILY DEVELOPMENT**: Run `python run_tests.py` frequently
+- **NEVER**: Use print statements or quick checks for validation
+- **REQUIRED**: Update existing tests when functionality changes
+- **PREFER**: Unit tests over integration tests for faster feedback
+- **BEFORE RELEASES**: Run full integration test suite
 
 ### Running All Tests
 
 ```bash
-# Run unit tests only (fast)
+# Run unit tests only (fast, recommended for daily development)
 python run_tests.py
 
-# Run integration tests (requires API keys)
-python run_integration_tests.py
-# OR
-python run_tests.py --integration
+# Run integration tests (requires API keys, use before releases)
+python -m pytest tests/integration/
 
 # Run all tests with pytest
 python -m pytest tests/ -v
@@ -858,13 +899,97 @@ python -m pytest tests/ -m "not slow" -v      # Skip slow tests
 
 The test runners automatically handle Python path setup and provide clear feedback about test results and any configuration issues.
 
-### Benefits of the New Structure
+### Component-Based Architecture Benefits
 
-- **Clean imports**: No more `sys.path` manipulation needed
-- **Standard packaging**: Follows modern Python best practices
+- **Clean imports**: Uses relative imports within `src/youtube_notion/` package
+- **Standard packaging**: Follows modern Python best practices with `pyproject.toml`
 - **IDE-friendly**: Better autocomplete and code navigation
-- **Installable**: Can be installed as a proper Python package
-- **Maintainable**: Clear separation of concerns and modules
+- **Installable**: Can be installed as a proper Python package with `pip install -e .`
+- **Maintainable**: Clear separation of concerns with dependency injection
+- **Testable**: All components implement abstract interfaces for easy mocking
+
+## Development
+
+### Component-Based Architecture
+
+This project follows a **component-based architecture** with clear separation of concerns:
+
+#### Key Architecture Rules
+
+1. **Component Creation**: Always use `ComponentFactory` - never instantiate components directly
+2. **Import Style**: Use relative imports within `src/youtube_notion/` package
+3. **Error Handling**: Use specific exception types from `utils/exceptions.py`
+4. **Testing**: Write unit tests for all functionality changes - run `python run_tests.py`
+5. **Configuration**: Validate component configuration at initialization
+6. **Interfaces**: All components must implement abstract interfaces for testability
+
+#### Component Responsibilities
+
+| Component | Purpose | Key Functions |
+|-----------|---------|---------------|
+| `main.py` | Application entry point | Orchestrates ComponentFactory and VideoProcessor |
+| `interfaces/` | Abstract contracts | `Storage`, `SummaryWriter` interfaces |
+| `extractors/` | YouTube metadata | URL validation, video ID extraction, metadata retrieval |
+| `writers/` | AI summary generation | Gemini AI integration with streaming and retry logic |
+| `storage/` | Data persistence | Notion database operations with rich text conversion |
+| `processors/` | Workflow orchestration | Coordinates all components through dependency injection |
+| `config/factory.py` | Dependency injection | Creates and configures components based on environment |
+| `utils/exceptions.py` | Error handling | Structured exception hierarchy |
+| `utils/chat_logger.py` | Conversation logging | Automatic cleanup and structured logging |
+
+#### Standard Component Creation Pattern
+```python
+from .config.factory import ComponentFactory
+
+# Always use factory for component creation
+factory = ComponentFactory()
+processor = VideoProcessor(
+    factory.create_metadata_extractor(),
+    factory.create_summary_writer(),
+    factory.create_storage()
+)
+success = processor.process_video(url)
+```
+
+### Development Commands
+
+**Setup** (required):
+```bash
+pip install -e .
+cp .env.example .env
+```
+
+**Testing** (primary development workflow):
+```bash
+python run_tests.py                    # Unit tests (fast, ~6 seconds)
+python -m pytest tests/integration/   # Integration tests (slow, ~90 seconds)
+```
+
+**Running application**:
+```bash
+python youtube_notion_cli.py --example-data  # Default mode
+python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # YouTube mode
+python youtube_notion_cli.py --urls "url1,url2,url3"  # Batch mode
+python youtube_notion_cli.py --file urls.txt  # Batch from file
+```
+
+### Error Handling
+
+The system uses a structured exception hierarchy from `utils/exceptions.py`:
+
+- `VideoProcessingError` - Base for video processing failures
+- `ConfigurationError` - Configuration validation failures
+- `MetadataExtractionError` - Video metadata extraction failures
+- `SummaryGenerationError` - AI summary generation failures
+- `StorageError` - Data persistence failures
+
+**Error Handling Patterns**:
+- Return boolean success indicators from main functions
+- Validate component configuration at initialization
+- Implement graceful fallbacks (YouTube API → web scraping)
+- Provide user-friendly error messages with troubleshooting context
+- Parse `retryDelay` from API responses and wait appropriately
+- Cap retry delays to 5 seconds during testing to prevent hangs
 
 ## Smart Timestamp Features
 
@@ -920,6 +1045,20 @@ pip install -e .
 # - Use the CLI command: `youtube-notion`
 # - Make changes without reinstalling
 ```
+
+### Dependencies
+
+The project uses these core dependencies:
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `notion-client` | Latest | Official Notion API client |
+| `google-genai` | >=0.1.0 | Google Gemini AI integration |
+| `google-api-python-client` | >=2.0.0 | YouTube Data API access |
+| `python-dotenv` | Latest | Environment variable management |
+| `requests` | >=2.25.0 | HTTP requests and web scraping |
+| `pytest` | Latest | Testing framework |
+| `hypothesis` | Latest | Property-based testing |
 
 ### Markdown Conversion Features
 
@@ -1023,7 +1162,7 @@ python youtube_notion_cli.py --url "https://youtu.be/abc" --urls "url1,url2"
 
 # ✅ Valid combinations
 python youtube_notion_cli.py --url "https://youtu.be/abc" --prompt "Custom prompt"
-python youtube_notion_cli.py --urls "https://youtu.be/abc,https://youtu.be/def"
+python youtube_notion_cli.py --urls "url1,url2,url3"
 python youtube_notion_cli.py --file urls.txt
 python youtube_notion_cli.py --example-data
 python youtube_notion_cli.py  # Defaults to example data
