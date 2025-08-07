@@ -30,9 +30,16 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 
 ### AI Summary Requirements
 - Use `GeminiSummaryWriter` for structured summaries
+- **CRITICAL**: Pass YouTube URLs as FileData to Gemini API (not text prompts)
 - Support streaming responses with progress indicators
-- Handle markdown: headers (H1-H3), lists, bold, italic
+- Handle markdown: headers (H1-H3), lists, bold, italic, **nested formatting in tables**
 - Automatic conversation logging to `chat_logs/` directory
+
+### Advanced Markdown Processing
+- **Table Support**: Full table parsing with nested formatting (bold, italic, links)
+- **Rich Text in Cells**: Each table cell supports complete markdown formatting
+- **Code Block Preservation**: Markdown formatting ignored within code blocks
+- **Property-Based Validation**: Robust parsing tested with generated edge cases
 
 ### Batch Processing
 - Support multiple URLs with progress tracking ("Processing 3/10...")
@@ -57,6 +64,8 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 
 ### Database Integration
 - Use `NotionStorage` implementation of `Storage` interface
+- **CRITICAL**: Implement block batching for summaries >100 blocks
 - Automatically discover target databases by name
 - Check for duplicates before creating pages
 - Map video metadata to Notion page properties
+- Handle Notion's 100-block limit with automatic batching (first 100 blocks + append remaining)

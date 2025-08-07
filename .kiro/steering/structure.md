@@ -123,6 +123,7 @@ tests/
 │   ├── test_video_processor.py
 │   ├── test_component_factory.py
 │   ├── test_main.py
+│   ├── test_property_based_markdown_converter.py  # Property-based tests
 │   └── utils/
 │       ├── test_exceptions.py
 │       ├── test_chat_logger.py
@@ -161,6 +162,8 @@ tests/
 - **FAST**: Tests must complete in seconds, not minutes
 - **COMPREHENSIVE**: Cover success paths, error conditions, and edge cases
 - **DEPENDENCY INJECTION**: Test components through their interfaces
+- **PROPERTY-BASED**: Use Hypothesis for complex validation (e.g., markdown parsing)
+- **PYTEST ONLY**: All tests must use pytest framework consistently
 
 **Integration Test Guidelines**:
 - **ENVIRONMENT**: Use `.env-test` configuration exclusively
@@ -206,8 +209,8 @@ python -m pytest tests/integration/   # Integration tests (slow, ~90 seconds)
 ```bash
 python youtube_notion_cli.py --example-data  # Default mode
 python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # YouTube mode
-python youtube_notion_cli.py --batch --urls url1 url2 url3  # Batch mode
-python youtube_notion_cli.py --batch --file urls.txt  # Batch from file
+python youtube_notion_cli.py --urls "url1,url2,url3"  # Batch mode
+python youtube_notion_cli.py --file urls.txt  # Batch from file
 ```
 
 ## Key Architecture Rules
