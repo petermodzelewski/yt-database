@@ -1,6 +1,7 @@
 import re
 from typing import List, Tuple
 from datetime import timedelta
+from ..config.constants import MAX_VIDEO_DURATION_SECONDS
 
 def parse_iso8601_duration(duration: str) -> int:
     """
@@ -42,7 +43,7 @@ def parse_iso8601_duration(duration: str) -> int:
 
 def calculate_video_splits(
     duration_seconds: int,
-    max_chunk_duration: int = 2700,  # 45 minutes
+    max_chunk_duration: int = MAX_VIDEO_DURATION_SECONDS,
     min_chunk_duration: int = 1200,  # 20 minutes
     overlap_duration: int = 300,  # 5 minutes
 ) -> List[Tuple[int, int]]:
