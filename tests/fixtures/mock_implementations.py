@@ -534,3 +534,224 @@ def create_mixed_mocks() -> Tuple[MockMetadataExtractor, MockSummaryWriter, Mock
     )
     
     return metadata_extractor, summary_writer, storage
+
+
+class MockQueueManager:
+    """
+    Mock implementation of QueueManager for testing web server functionality.
+    
+    This mock provides in-memory queue management and can simulate various
+    scenarios for testing the web UI components.
+    """
+    
+    def __init__(self):
+        """Initialize the mock queue manager."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        import uuid
+        
+        # In-memory storage
+        self.items: Dict[str, QueueItem] = {}
+        self.status_listeners: List = []
+        
+        # Call tracking
+        self.enqueue_calls: List[Tuple[str, Optional[str]]] = []
+        self.get_queue_status_calls: List[tuple] = []
+        self.get_item_status_calls: List[str] = []
+        self.add_status_listener_calls: List = []
+        self.remove_status_listener_calls: List = []
+        self.start_processing_calls: List[tuple] = []
+        self.stop_processing_calls: List[tuple] = []
+        
+        # Mock state
+        self.processing_started = False
+        self.should_fail_enqueue = False
+        self.fail_on_urls: List[str] = []
+        
+        # Mock methods for unittest.mock compatibility
+        self.enqueue = Mock(side_effect=self._enqueue)
+        self.get_queue_status = Mock(side_effect=self._get_queue_status)
+        self.get_item_status = Mock(side_effect=self._get_item_status)
+        self.add_status_listener = Mock(side_effect=self._add_status_listener)
+        self.remove_status_listener = Mock(side_effect=self._remove_status_listener)
+        self.start_processing = Mock(side_effect=self._start_processing)
+        self.stop_processing = Mock(side_effect=self._stop_processing)
+        self.get_statistics = Mock(side_effect=self._get_statistics)
+    
+    def _enqueue(self, url: str, custom_prompt: Optional[str] = None) -> str:
+        """Add a URL to the processing queue."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        import uuid
+        
+        # Track the call
+        self.enqueue_calls.append((url, custom_prompt))
+        
+        # Check if we should fail
+        if self.should_fail_enqueue or url in self.fail_on_urls:
+            from src.youtube_notion.utils.exceptions import VideoProcessingError
+            raise VideoProcessingError(f"Mock enqueue failed for {url}")
+        
+        # Create new queue item
+        item_id = str(uuid.uuid4())[:8]  # Short ID for testing
+        item = QueueItem(
+            id=item_id,
+            url=url,
+            custom_prompt=custom_prompt,
+            status=QueueStatus.TODO,
+            created_at=datetime.now()
+        )
+        
+        # Store the item
+        self.items[item_id] = item
+        
+        # Notify listeners
+        self._notify_status_change(item_id, item)
+        
+        return item_id
+    
+    def _get_queue_status(self) -> Dict[str, List]:
+        """Get current queue status organized by processing state."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        # Track the call
+        self.get_queue_status_calls.append(())
+        
+        # Organize items by status
+        status_dict = {
+            'todo': [],
+            'in_progress': [],
+            'completed': [],
+            'failed': []
+        }
+        
+        for item in self.items.values():
+            if item.status == QueueStatus.TODO:
+                status_dict['todo'].append(item)
+            elif item.status == QueueStatus.IN_PROGRESS:
+                status_dict['in_progress'].append(item)
+            elif item.status == QueueStatus.COMPLETED:
+                status_dict['completed'].append(item)
+            elif item.status == QueueStatus.FAILED:
+                status_dict['failed'].append(item)
+        
+        return status_dict
+    
+    def _get_item_status(self, item_id: str):
+        """Get status of a specific queue item."""
+        # Track the call
+        self.get_item_status_calls.append(item_id)
+        
+        return self.items.get(item_id)
+    
+    def _add_status_listener(self, callback):
+        """Add a status change listener."""
+        # Track the call
+        self.add_status_listener_calls.append(callback)
+        
+        if callback not in self.status_listeners:
+            self.status_listeners.append(callback)
+    
+    def _remove_status_listener(self, callback):
+        """Remove a status change listener."""
+        # Track the call
+        self.remove_status_listener_calls.append(callback)
+        
+        if callback in self.status_listeners:
+            self.status_listeners.remove(callback)
+    
+    def _start_processing(self):
+        """Start processing queue items."""
+        # Track the call
+        self.start_processing_calls.append(())
+        
+        self.processing_started = True
+    
+    def _stop_processing(self):
+        """Stop processing queue items."""
+        # Track the call
+        self.stop_processing_calls.append(())
+        
+        self.processing_started = False
+    
+    def _get_statistics(self) -> Dict[str, int]:
+        """Get queue statistics."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        stats = {
+            'total_items': len(self.items),
+            'todo': 0,
+            'in_progress': 0,
+            'completed': 0,
+            'failed': 0
+        }
+        
+        for item in self.items.values():
+            if item.status == QueueStatus.TODO:
+                stats['todo'] += 1
+            elif item.status == QueueStatus.IN_PROGRESS:
+                stats['in_progress'] += 1
+            elif item.status == QueueStatus.COMPLETED:
+                stats['completed'] += 1
+            elif item.status == QueueStatus.FAILED:
+                stats['failed'] += 1
+        
+        return stats
+    
+    def _notify_status_change(self, item_id: str, item):
+        """Notify all listeners of status change."""
+        for listener in self.status_listeners:
+            try:
+                listener(item_id, item)
+            except Exception:
+                # Ignore listener errors in mock
+                pass
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.enqueue_calls.clear()
+        self.get_queue_status_calls.clear()
+        self.get_item_status_calls.clear()
+        self.add_status_listener_calls.clear()
+        self.remove_status_listener_calls.clear()
+        self.start_processing_calls.clear()
+        self.stop_processing_calls.clear()
+    
+    def clear_queue(self):
+        """Clear all queue items."""
+        self.items.clear()
+    
+    def add_mock_item(self, item_id: str, url: str, status=None):
+        """Add a mock item to the queue for testing."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        
+        if status is None:
+            from src.youtube_notion.web.models import QueueStatus
+            status = QueueStatus.TODO
+        
+        item = QueueItem(
+            id=item_id,
+            url=url,
+            status=status,
+            created_at=datetime.now()
+        )
+        
+        self.items[item_id] = item
+        return item
+    
+    def set_item_status(self, item_id: str, status):
+        """Set the status of a specific item."""
+        if item_id in self.items:
+            self.items[item_id].status = status
+            self._notify_status_change(item_id, self.items[item_id])
+    
+    def set_failure_for_url(self, url: str):
+        """Configure a specific URL to fail on enqueue."""
+        if url not in self.fail_on_urls:
+            self.fail_on_urls.append(url)
+    
+    def clear_failures(self):
+        """Clear all failure configurations."""
+        self.should_fail_enqueue = False
+        self.fail_on_urls.clear()
