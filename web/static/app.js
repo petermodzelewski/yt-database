@@ -1,164 +1,81 @@
 /**
  * YouTube to Notion Queue Manager - Frontend Application
  * 
- * This file provides the basic structure for the web UI application.
- * It includes placeholder functions and event handlers that will be
- * implemented in subsequent tasks.
+ * Main application class with component-based architecture.
+ * Coordinates between components and manages application state.
  */
 
+/**
+ * Main application class with component-based architecture
+ */
 class YouTubeNotionApp {
     constructor() {
+        this.components = {};
         this.init();
     }
 
     init() {
         console.log('YouTube to Notion Queue Manager initialized');
+        
+        // Initialize components
+        this.components.queueColumns = new QueueColumns();
+        this.components.urlInput = new UrlInput();
+        this.components.chatLogModal = new ChatLogModal();
+        
+        // Setup main event listeners
         this.setupEventListeners();
-        this.updateStats();
+        
+        // Initial render
+        this.updateQueueDisplay({ todo: [], 'in-progress': [], done: [] });
     }
 
     setupEventListeners() {
         // Add URL button
-        const addUrlBtn = document.getElementById('add-url-btn');
+        const addUrlBtn = DOMUtils.getElementById('add-url-btn');
         if (addUrlBtn) {
-            addUrlBtn.addEventListener('click', () => {
-                console.log('Add URL button clicked - functionality to be implemented');
-                // TODO: Implement in task 8
+            DOMUtils.addEventListener(addUrlBtn, 'click', () => {
+                this.components.urlInput.show();
             });
         }
-
-        // Modal close buttons
-        const modalCloseButtons = document.querySelectorAll('.modal-close');
-        modalCloseButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const modal = e.target.closest('.modal-overlay');
-                if (modal) {
-                    modal.classList.remove('active');
-                }
-            });
-        });
-
-        // Close modal on overlay click
-        const modalOverlays = document.querySelectorAll('.modal-overlay');
-        modalOverlays.forEach(overlay => {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.classList.remove('active');
-                }
-            });
-        });
     }
 
-    updateStats() {
-        // Update header statistics
-        const totalCount = document.getElementById('total-count');
-        const processingCount = document.getElementById('processing-count');
-        const todoCount = document.getElementById('todo-count');
-        const inProgressCount = document.getElementById('in-progress-count');
-        const doneCount = document.getElementById('done-count');
-
-        // Placeholder values - will be updated with real data in later tasks
-        if (totalCount) totalCount.textContent = '0';
-        if (processingCount) processingCount.textContent = '0';
-        if (todoCount) todoCount.textContent = '0';
-        if (inProgressCount) inProgressCount.textContent = '0';
-        if (doneCount) doneCount.textContent = '0';
+    /**
+     * Add URL to queue (placeholder for task 8)
+     * @param {string} url - YouTube URL
+     * @param {string|null} customPrompt - Custom prompt
+     */
+    async addQueueItem(url, customPrompt = null) {
+        console.log('addQueueItem called - to be implemented in task 8', { url, customPrompt });
+        // TODO: Implement URL validation and API call in task 8
+        throw new Error('URL submission functionality will be implemented in task 8');
     }
 
-    // Placeholder methods for future implementation
-    addQueueItem(url, customPrompt = null) {
-        console.log('addQueueItem called - to be implemented in task 8');
-        // TODO: Implement URL validation and API call
-    }
-
+    /**
+     * Update queue display with new data
+     * @param {Object} queueData - Queue data organized by status
+     */
     updateQueueDisplay(queueData) {
-        console.log('updateQueueDisplay called - to be implemented in task 9');
-        // TODO: Implement real-time UI updates
+        console.log('updateQueueDisplay called', queueData);
+        this.components.queueColumns.render(queueData);
     }
 
-    showChatLog(itemId) {
-        console.log('showChatLog called - to be implemented in task 11');
-        // TODO: Implement chat log modal
+    /**
+     * Show chat log modal
+     * @param {string} itemId - Queue item ID
+     * @param {number|null} chunkIndex - Chunk index for chunked videos
+     */
+    showChatLog(itemId, chunkIndex = null) {
+        console.log('showChatLog called', { itemId, chunkIndex });
+        this.components.chatLogModal.show(itemId, chunkIndex);
     }
 
-    // Utility method to create queue item HTML
-    createQueueItemHTML(item) {
-        return `
-            <div class="queue-item" data-item-id="${item.id}">
-                <div class="item-header">
-                    <div class="item-thumbnail">
-                        ${item.thumbnail_url ? 
-                            `<img src="${item.thumbnail_url}" alt="Video thumbnail">` : 
-                            'No thumbnail'
-                        }
-                    </div>
-                    <div class="item-info">
-                        <div class="item-title">${item.title || 'Loading...'}</div>
-                        <div class="item-channel">${item.channel || ''}</div>
-                        <div class="item-duration">${item.duration || ''}</div>
-                    </div>
-                </div>
-                <div class="item-status">
-                    <span class="status-text">
-                        <span class="status-icon ${item.status}"></span>
-                        ${this.getStatusText(item)}
-                    </span>
-                </div>
-                ${item.status === 'in_progress' ? this.createProgressBar(item) : ''}
-                ${item.status === 'completed' ? this.createActionButtons(item) : ''}
-            </div>
-        `;
-    }
-
-    getStatusText(item) {
-        switch (item.status) {
-            case 'todo':
-                return 'Waiting in queue';
-            case 'in_progress':
-                return item.current_phase || 'Processing...';
-            case 'completed':
-                return 'Completed successfully';
-            case 'failed':
-                return item.error_message || 'Processing failed';
-            default:
-                return 'Unknown status';
-        }
-    }
-
-    createProgressBar(item) {
-        const progress = this.calculateProgress(item);
-        return `
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${progress}%"></div>
-            </div>
-        `;
-    }
-
-    calculateProgress(item) {
-        // Simple progress calculation based on current phase
-        const phases = ['metadata', 'summary', 'upload'];
-        const currentPhase = item.current_phase || '';
-        
-        if (currentPhase.includes('metadata')) return 25;
-        if (currentPhase.includes('summary')) return 50;
-        if (currentPhase.includes('upload')) return 75;
-        return 10; // Default progress
-    }
-
-    createActionButtons(item) {
-        let buttons = '';
-        
-        if (item.chat_log_path) {
-            buttons += `<button class="action-btn primary" onclick="app.showChatLog('${item.id}')">👁 View Log</button>`;
-        }
-        
-        if (item.chunk_logs && item.chunk_logs.length > 0) {
-            item.chunk_logs.forEach((log, index) => {
-                buttons += `<button class="action-btn" onclick="app.showChatLog('${item.id}', ${index})">👁 ${index + 1}</button>`;
-            });
-        }
-        
-        return buttons ? `<div class="item-actions">${buttons}</div>` : '';
+    /**
+     * Get reference to a component
+     * @param {string} name - Component name
+     * @returns {Object|null}
+     */
+    getComponent(name) {
+        return this.components[name] || null;
     }
 }
 
