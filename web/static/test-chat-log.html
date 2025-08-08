@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Log Modal Test</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <h1>Chat Log Modal Test</h1>
+        
+        <!-- Test buttons -->
+        <div style="margin: 20px;">
+            <button id="test-main-log" class="btn btn-primary">Test Main Chat Log</button>
+            <button id="test-chunk-log" class="btn btn-secondary">Test Chunk Log</button>
+            <button id="test-error-log" class="btn btn-secondary">Test Error Case</button>
+        </div>
+        
+        <!-- Sample queue item for testing -->
+        <div class="queue-item completed" style="max-width: 400px; margin: 20px;">
+            <div class="item-header">
+                <div class="item-thumbnail">
+                    <div class="thumbnail-placeholder">📺</div>
+                </div>
+                <div class="item-info">
+                    <div class="item-title">Test Video - Chat Log Implementation</div>
+                    <div class="item-channel">Test Channel</div>
+                    <div class="item-duration">10:30</div>
+                </div>
+            </div>
+            <div class="item-status">
+                <span class="status-text">
+                    <span class="status-icon completed"></span>
+                    Completed successfully
+                </span>
+            </div>
+            <div class="item-actions">
+                <button class="action-btn eye-btn primary" onclick="showTestChatLog('main')">
+                    <span class="eye-icon">👁</span>
+                    <span class="btn-text">View Log</span>
+                </button>
+                <button class="action-btn eye-btn chunk-btn" onclick="showTestChatLog('chunk', 0)">
+                    <span class="eye-icon">👁</span>
+                    <span class="chunk-number">1</span>
+                </button>
+                <button class="action-btn eye-btn chunk-btn" onclick="showTestChatLog('chunk', 1)">
+                    <span class="eye-icon">👁</span>
+                    <span class="chunk-number">2</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Log Modal -->
+        <div class="modal-overlay" id="chat-modal-overlay">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="chat-modal-title">Processing Log</h3>
+                    <button class="modal-close" id="chat-modal-close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="chat-log-content" id="chat-log-content">
+                        <!-- Chat log content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Scripts -->
+    <script src="components/dom-utils.js"></script>
+    <script src="components/chat-log-modal.js"></script>
+    
+    <script>
+        // Initialize chat log modal
+        const chatModal = new ChatLogModal();
+        
+        // Mock data for testing
+        const mockChatLogData = {
+            main: {
+                item_id: "test-123",
+                url: "https://youtu.be/test123",
+                title: "Test Video - Chat Log Implementation",
+                chat_log: `User: Please analyze this YouTube video and provide a comprehensive summary.Assistant
+: I'll analyze this video for you. Let me break down the key points:
+
+## Video Overview
+This video discusses the implementation of chat log viewing functionality in a web application.
+
+### Key Topics Covered:
+- **[2:15]** Introduction to the chat log modal component
+- **[5:30]** Backend API endpoint implementation
+- **[8:45]** Frontend JavaScript integration
+
+### Technical Implementation:
+1. **Modal Component**: Created a reusable chat log modal with proper styling
+2. **API Integration**: Added support for both main logs and chunk-specific logs
+3. **User Experience**: Eye buttons for easy access to processing logs
+
+The implementation includes:
+- Syntax highlighting for timestamps like [2:15]
+- Support for **bold** and *italic* formatting
+- Proper error handling and loading states
+- Responsive design for mobile devices
+
+### Code Examples:
+\`\`\`javascript
+// Example of chat log modal usage
+const modal = new ChatLogModal();
+modal.show('item-123', chunkIndex);
+\`\`\`
+
+This is a comprehensive solution for viewing AI conversation logs in the YouTube-to-Notion integration system.`,
+                chunk_logs: ["chunk_0.txt", "chunk_1.txt"],
+                created_at: "2025-01-08T10:00:00Z",
+                completed_at: "2025-01-08T10:05:00Z"
+            },
+            chunk0: {
+                item_id: "test-123",
+                url: "https://youtu.be/test123",
+                title: "Test Video - Chat Log Implementation",
+                chat_log: `User: Process the first part of this long video (chunk 1/2).Assistant
+: I'll analyze the first part of this video for you.
+
+## Chunk 1 Analysis (0:00 - 45:00)
+
+### Introduction Section:
+- **[0:30]** Video begins with overview of the project
+- **[2:15]** Explanation of the web UI architecture
+- **[5:45]** Discussion of component-based design
+
+### Technical Details:
+This chunk covers the foundational concepts:
+1. **Queue Management**: How items move through processing states
+2. **Real-time Updates**: Server-Sent Events implementation
+3. **User Interface**: Three-column layout design
+
+### Key Code Snippets:
+\`\`\`python
+# Queue item processing
+def process_video_chunk(url, start_time, end_time):
+    return process_segment(url, start_time, end_time)
+\`\`\`
+
+The first chunk establishes the core architecture and explains the motivation behind the design decisions.`,
+                chunk_index: 0,
+                is_chunk_log: true,
+                created_at: "2025-01-08T10:00:00Z",
+                completed_at: "2025-01-08T10:02:30Z"
+            },
+            chunk1: {
+                item_id: "test-123",
+                url: "https://youtu.be/test123",
+                title: "Test Video - Chat Log Implementation",
+                chat_log: `User: Process the second part of this long video (chunk 2/2).Assistan
+t: I'll analyze the second part of this video for you.
+
+## Chunk 2 Analysis (45:00 - 90:00)
+
+### Implementation Details:
+- **[47:20]** Chat log modal component implementation
+- **[52:15]** Backend API endpoint for log retrieval
+- **[58:30]** Frontend JavaScript integration
+
+### Advanced Features:
+This chunk covers the implementation specifics:
+1. **Syntax Highlighting**: Formatting timestamps and code blocks
+2. **Error Handling**: Graceful failure and user feedback
+3. **Chunk Support**: Multiple log files for long videos
+
+### Final Implementation:
+\`\`\`javascript
+// Chat log formatting with syntax highlighting
+function formatChatLogContent(content) {
+    return content
+        .replace(/\\[(\\d{1,2}:\\d{2}(?::\\d{2})?)\\]/g, '<span class="timestamp">[$1]</span>')
+        .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+}
+\`\`\`
+
+### Summary:
+The second chunk completes the implementation with:
+- Full chat log viewing functionality
+- Support for chunked video logs
+- Proper styling and user experience
+- Comprehensive error handling
+
+This completes the chat log viewing feature implementation.`,
+                chunk_index: 1,
+                is_chunk_log: true,
+                created_at: "2025-01-08T10:02:30Z",
+                completed_at: "2025-01-08T10:05:00Z"
+            }
+        };
+        
+        // Mock fetch function for testing
+        const originalFetch = window.fetch;
+        window.fetch = function(url) {
+            console.log('Mock fetch called with:', url);
+            
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    if (url.includes('/api/chat-log/test-123?chunk=0')) {
+                        resolve({
+                            ok: true,
+                            json: () => Promise.resolve(mockChatLogData.chunk0)
+                        });
+                    } else if (url.includes('/api/chat-log/test-123?chunk=1')) {
+                        resolve({
+                            ok: true,
+                            json: () => Promise.resolve(mockChatLogData.chunk1)
+                        });
+                    } else if (url.includes('/api/chat-log/test-123')) {
+                        resolve({
+                            ok: true,
+                            json: () => Promise.resolve(mockChatLogData.main)
+                        });
+                    } else if (url.includes('/api/chat-log/error-test')) {
+                        resolve({
+                            ok: false,
+                            status: 404,
+                            statusText: 'Not Found',
+                            json: () => Promise.resolve({ detail: 'Chat log not found' })
+                        });
+                    } else {
+                        resolve({
+                            ok: false,
+                            status: 500,
+                            statusText: 'Internal Server Error',
+                            json: () => Promise.resolve({ detail: 'Server error' })
+                        });
+                    }
+                }, 500); // Simulate network delay
+            });
+        };
+        
+        // Test functions
+        function showTestChatLog(type, chunkIndex = null) {
+            if (type === 'main') {
+                chatModal.show('test-123');
+            } else if (type === 'chunk') {
+                chatModal.show('test-123', chunkIndex);
+            }
+        }
+        
+        // Event listeners for test buttons
+        document.getElementById('test-main-log').addEventListener('click', () => {
+            showTestChatLog('main');
+        });
+        
+        document.getElementById('test-chunk-log').addEventListener('click', () => {
+            showTestChatLog('chunk', 0);
+        });
+        
+        document.getElementById('test-error-log').addEventListener('click', () => {
+            chatModal.show('error-test');
+        });
+        
+        console.log('Chat log test page loaded. Click the buttons to test the modal functionality.');
+    </script>
+</body>
+</html>

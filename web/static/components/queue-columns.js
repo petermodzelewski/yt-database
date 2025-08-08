@@ -227,27 +227,46 @@ class QueueColumns {
     createActionButtons(item) {
         const buttons = [];
         
-        // Main chat log button
-        if (item.chat_log_path) {
-            const viewLogBtn = DOMUtils.createElement('button', {
-                className: 'action-btn primary'
-            }, '👁 View Log');
-            
-            DOMUtils.addEventListener(viewLogBtn, 'click', () => {
-                window.app.showChatLog(item.id);
-            });
-            
-            buttons.push(viewLogBtn);
+        // Only show buttons for completed items
+        if (item.status !== 'completed') {
+            return null;
         }
         
-        // Chunk log buttons
+        // Main chat log button - always show for completed items
+        const viewLogBtn = DOMUtils.createElement('button', {
+            className: 'action-btn eye-btn primary',
+            title: 'View processing log'
+        });
+        
+        const eyeIcon = DOMUtils.createElement('span', { className: 'eye-icon' }, '👁');
+        const btnText = DOMUtils.createElement('span', { className: 'btn-text' }, 'View Log');
+        
+        viewLogBtn.appendChild(eyeIcon);
+        viewLogBtn.appendChild(btnText);
+        
+        DOMUtils.addEventListener(viewLogBtn, 'click', (e) => {
+            e.stopPropagation();
+            window.app.showChatLog(item.id);
+        });
+        
+        buttons.push(viewLogBtn);
+        
+        // Chunk log buttons for chunked videos
         if (item.chunk_logs && item.chunk_logs.length > 0) {
             item.chunk_logs.forEach((log, index) => {
                 const chunkBtn = DOMUtils.createElement('button', {
-                    className: 'action-btn'
-                }, `👁 ${index + 1}`);
+                    className: 'action-btn eye-btn chunk-btn',
+                    title: `View chunk ${index + 1} log`
+                });
                 
-                DOMUtils.addEventListener(chunkBtn, 'click', () => {
+                const chunkEyeIcon = DOMUtils.createElement('span', { className: 'eye-icon' }, '👁');
+                const chunkNumber = DOMUtils.createElement('span', { className: 'chunk-number' }, (index + 1).toString());
+                
+                chunkBtn.appendChild(chunkEyeIcon);
+                chunkBtn.appendChild(chunkNumber);
+                
+                DOMUtils.addEventListener(chunkBtn, 'click', (e) => {
+                    e.stopPropagation();
                     window.app.showChatLog(item.id, index);
                 });
                 

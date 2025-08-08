@@ -163,12 +163,13 @@ class WebServer:
                 )
         
         @self.app.get("/api/chat-log/{item_id}")
-        async def get_chat_log_endpoint(item_id: str) -> dict:
+        async def get_chat_log_endpoint(item_id: str, chunk: Optional[int] = None) -> dict:
             """
             Retrieve chat log for a specific queue item.
             
             Args:
                 item_id: Unique identifier for the queue item
+                chunk: Optional chunk index for chunked videos
                 
             Returns:
                 dict: Chat log content and metadata
@@ -185,21 +186,34 @@ class WebServer:
                         detail=f"Item {item_id} not found"
                     )
                 
-                # Check if chat log exists
-                if not item.chat_log_path:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Chat log not available for item {item_id}"
-                    )
+                # Determine which chat log to retrieve
+                chat_log_path = None
                 
-                # Read chat log file
-                chat_log_path = Path(item.chat_log_path)
+                if chunk is not None:
+                    # Request for specific chunk log
+                    if not item.chunk_logs or chunk < 0 or chunk >= len(item.chunk_logs):
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"Chunk {chunk} not found for item {item_id}"
+                        )
+                    chat_log_path = Path(item.chunk_logs[chunk])
+                else:
+                    # Request for main chat log
+                    if not item.chat_log_path:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"Chat log not available for item {item_id}"
+                        )
+                    chat_log_path = Path(item.chat_log_path)
+                
+                # Check if chat log file exists
                 if not chat_log_path.exists():
                     raise HTTPException(
                         status_code=404,
-                        detail=f"Chat log file not found: {item.chat_log_path}"
+                        detail=f"Chat log file not found: {chat_log_path}"
                     )
                 
+                # Read chat log file
                 try:
                     with open(chat_log_path, 'r', encoding='utf-8') as f:
                         chat_content = f.read()
@@ -215,6 +229,8 @@ class WebServer:
                     "title": item.title,
                     "chat_log": chat_content,
                     "chunk_logs": item.chunk_logs,
+                    "chunk_index": chunk,
+                    "is_chunk_log": chunk is not None,
                     "created_at": item.created_at.isoformat(),
                     "completed_at": item.completed_at.isoformat() if item.completed_at else None
                 }

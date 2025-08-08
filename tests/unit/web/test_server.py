@@ -149,6 +149,110 @@ class TestWebServerAPIEndpoints:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
     
+    def test_get_chat_log_endpoint_chunk_success(self, test_client, mock_queue_manager):
+        """Test successful chunk chat log retrieval."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        import tempfile
+        from pathlib import Path
+        
+        # Create temporary chunk log files
+        chunk_files = []
+        try:
+            for i in range(2):
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=f'_chunk_{i}.txt') as f:
+                    f.write(f"Chunk {i} chat log content")
+                    chunk_files.append(f.name)
+            
+            # Setup mock item with chunk logs
+            test_item = QueueItem(
+                id="test-chunked",
+                url="https://youtu.be/longvideo",
+                status=QueueStatus.COMPLETED,
+                title="Long Video",
+                chunk_logs=chunk_files,
+                completed_at=datetime.now()
+            )
+            mock_queue_manager.get_item_status.return_value = test_item
+            
+            # Test chunk 0
+            response = test_client.get("/api/chat-log/test-chunked?chunk=0")
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["item_id"] == "test-chunked"
+            assert data["chat_log"] == "Chunk 0 chat log content"
+            assert data["chunk_index"] == 0
+            assert data["is_chunk_log"] is True
+            
+            # Test chunk 1
+            response = test_client.get("/api/chat-log/test-chunked?chunk=1")
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["chat_log"] == "Chunk 1 chat log content"
+            assert data["chunk_index"] == 1
+            
+        finally:
+            # Clean up temp files
+            for chunk_file in chunk_files:
+                Path(chunk_file).unlink(missing_ok=True)
+    
+    def test_get_chat_log_endpoint_chunk_not_found(self, test_client, mock_queue_manager):
+        """Test chunk chat log retrieval for non-existent chunk."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        
+        # Setup mock item without chunk logs
+        test_item = QueueItem(
+            id="test-no-chunks",
+            url="https://youtu.be/shortvideo",
+            status=QueueStatus.COMPLETED,
+            title="Short Video",
+            chunk_logs=[],
+            completed_at=datetime.now()
+        )
+        mock_queue_manager.get_item_status.return_value = test_item
+        
+        response = test_client.get("/api/chat-log/test-no-chunks?chunk=0")
+        
+        assert response.status_code == 404
+        assert "Chunk 0 not found" in response.json()["detail"]
+    
+    def test_get_chat_log_endpoint_chunk_out_of_range(self, test_client, mock_queue_manager):
+        """Test chunk chat log retrieval for out-of-range chunk index."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        import tempfile
+        from pathlib import Path
+        
+        # Create one chunk file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_chunk_0.txt') as f:
+            f.write("Only chunk content")
+            chunk_file = f.name
+        
+        try:
+            # Setup mock item with one chunk log
+            test_item = QueueItem(
+                id="test-one-chunk",
+                url="https://youtu.be/mediumvideo",
+                status=QueueStatus.COMPLETED,
+                title="Medium Video",
+                chunk_logs=[chunk_file],
+                completed_at=datetime.now()
+            )
+            mock_queue_manager.get_item_status.return_value = test_item
+            
+            # Request chunk 1 (out of range)
+            response = test_client.get("/api/chat-log/test-one-chunk?chunk=1")
+            
+            assert response.status_code == 404
+            assert "Chunk 1 not found" in response.json()["detail"]
+            
+        finally:
+            # Clean up temp file
+            Path(chunk_file).unlink(missing_ok=True)
+    
     def test_health_check_endpoint(self, test_client, mock_queue_manager):
         """Test health check endpoint."""
         mock_queue_manager.get_statistics.return_value = {
