@@ -221,6 +221,7 @@ class TestQueueItemResponse:
             title="Test Video",
             thumbnail_url="https://img.youtube.com/vi/test123/maxresdefault.jpg",
             channel="Test Channel",
+            duration=300,
             created_at=created_time,
             started_at=None,
             completed_at=None,
@@ -279,6 +280,7 @@ class TestQueueItemResponse:
             title="Test Video",
             thumbnail_url=None,
             channel=None,
+            duration=None,
             created_at=created_time,
             started_at=None,
             completed_at=None,
@@ -304,7 +306,7 @@ class TestQueueStatusResponse:
         todo_item = QueueItemResponse(
             id="todo-1", url="https://youtu.be/todo", custom_prompt=None,
             status="todo", title=None, thumbnail_url=None, channel=None,
-            created_at=datetime.now(), started_at=None, completed_at=None,
+            duration=None, created_at=datetime.now(), started_at=None, completed_at=None,
             error_message=None, chat_log_path=None, chunk_logs=[],
             current_phase=None, current_chunk=None, total_chunks=None
         )
@@ -312,7 +314,7 @@ class TestQueueStatusResponse:
         in_progress_item = QueueItemResponse(
             id="progress-1", url="https://youtu.be/progress", custom_prompt=None,
             status="in_progress", title=None, thumbnail_url=None, channel=None,
-            created_at=datetime.now(), started_at=datetime.now(), completed_at=None,
+            duration=None, created_at=datetime.now(), started_at=datetime.now(), completed_at=None,
             error_message=None, chat_log_path=None, chunk_logs=[],
             current_phase="Processing", current_chunk=None, total_chunks=None
         )

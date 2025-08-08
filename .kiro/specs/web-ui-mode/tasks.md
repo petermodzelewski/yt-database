@@ -124,7 +124,12 @@
   - Update queue columns in real-time without page refresh
   - _Requirements: 4.3, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 10. Add video metadata display and thumbnail extraction
+- [x] 10. Add video metadata display and thumbnail extraction
+
+
+
+
+
   - Implement thumbnail URL extraction from YouTube URLs
   - Display video title, channel, and duration when available
   - Show processing status and current phase for in-progress items

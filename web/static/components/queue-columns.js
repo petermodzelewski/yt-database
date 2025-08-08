@@ -74,17 +74,29 @@ class QueueColumns {
         if (item.thumbnail_url) {
             const img = DOMUtils.createElement('img', {
                 src: item.thumbnail_url,
-                alt: 'Video thumbnail'
+                alt: 'Video thumbnail',
+                loading: 'lazy'
             });
+            
+            // Handle image load errors with fallback
+            img.addEventListener('error', () => {
+                thumbnail.innerHTML = '';
+                thumbnail.appendChild(DOMUtils.createElement('div', { 
+                    className: 'thumbnail-placeholder' 
+                }, '📺'));
+            });
+            
             thumbnail.appendChild(img);
         } else {
-            thumbnail.textContent = 'No thumbnail';
+            thumbnail.appendChild(DOMUtils.createElement('div', { 
+                className: 'thumbnail-placeholder' 
+            }, item.title ? '📺' : '⏳'));
         }
         
         const info = DOMUtils.createElement('div', { className: 'item-info' });
         info.appendChild(DOMUtils.createElement('div', { className: 'item-title' }, item.title || 'Loading...'));
         info.appendChild(DOMUtils.createElement('div', { className: 'item-channel' }, item.channel || ''));
-        info.appendChild(DOMUtils.createElement('div', { className: 'item-duration' }, item.duration || ''));
+        info.appendChild(DOMUtils.createElement('div', { className: 'item-duration' }, this.formatDuration(item.duration)));
         
         header.appendChild(thumbnail);
         header.appendChild(info);
@@ -126,7 +138,14 @@ class QueueColumns {
             case 'todo':
                 return 'Waiting in queue';
             case 'in_progress':
-                return item.current_phase || 'Processing...';
+                let statusText = item.current_phase || 'Processing...';
+                
+                // Add chunk indicator for chunked videos
+                if (item.current_chunk && item.total_chunks) {
+                    statusText += ` (chunk ${item.current_chunk}/${item.total_chunks})`;
+                }
+                
+                return statusText;
             case 'completed':
                 return 'Completed successfully';
             case 'failed':
@@ -160,10 +179,44 @@ class QueueColumns {
     calculateProgress(item) {
         const currentPhase = item.current_phase || '';
         
+        // Handle chunked video progress
+        if (item.current_chunk && item.total_chunks) {
+            const chunkProgress = (item.current_chunk - 1) / item.total_chunks * 100;
+            
+            // Add phase progress within current chunk
+            let phaseProgress = 0;
+            if (currentPhase.includes('metadata')) phaseProgress = 10;
+            else if (currentPhase.includes('summary') || currentPhase.includes('chunk')) phaseProgress = 60;
+            else if (currentPhase.includes('upload')) phaseProgress = 90;
+            
+            const chunkSize = 100 / item.total_chunks;
+            return Math.min(95, chunkProgress + (phaseProgress / 100) * chunkSize);
+        }
+        
+        // Handle regular video progress
         if (currentPhase.includes('metadata')) return 25;
         if (currentPhase.includes('summary')) return 50;
         if (currentPhase.includes('upload')) return 75;
         return 10; // Default progress
+    }
+
+    /**
+     * Format duration in seconds to human-readable format
+     * @param {number|null} duration - Duration in seconds
+     * @returns {string} Formatted duration string
+     */
+    formatDuration(duration) {
+        if (!duration || duration <= 0) return '';
+        
+        const hours = Math.floor(duration / 3600);
+        const minutes = Math.floor((duration % 3600) / 60);
+        const seconds = duration % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
     }
 
     /**

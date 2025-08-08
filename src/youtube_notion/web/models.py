@@ -43,6 +43,7 @@ class QueueItem:
     title: Optional[str] = None
     thumbnail_url: Optional[str] = None
     channel: Optional[str] = None
+    duration: Optional[int] = None  # Duration in seconds
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -78,6 +79,7 @@ class QueueItemResponse(BaseModel):
     title: Optional[str]
     thumbnail_url: Optional[str]
     channel: Optional[str]
+    duration: Optional[int]  # Duration in seconds
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
@@ -99,6 +101,7 @@ class QueueItemResponse(BaseModel):
             title=item.title,
             thumbnail_url=item.thumbnail_url,
             channel=item.channel,
+            duration=item.duration,
             created_at=item.created_at,
             started_at=item.started_at,
             completed_at=item.completed_at,

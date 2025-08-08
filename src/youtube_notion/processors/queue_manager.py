@@ -475,6 +475,7 @@ class QueueManager:
                 item.title = metadata.get("title")
                 item.thumbnail_url = metadata.get("thumbnail_url")
                 item.channel = metadata.get("channel")
+                item.duration = metadata.get("duration")
                 self._notify_status_change(item_id, item)
             
             # Check if video needs chunked processing
@@ -690,7 +691,7 @@ class QueueManager:
         self.update_item_status(
             item_id,
             QueueStatus.IN_PROGRESS,
-            current_phase=f"Processing {total_chunks} video chunks",
+            current_phase=ProcessingPhase.CHUNK_PROCESSING.value,
             current_chunk=1,
             total_chunks=total_chunks
         )

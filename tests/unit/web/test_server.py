@@ -167,13 +167,14 @@ class TestWebServerAPIEndpoints:
         assert "queue_stats" in data
         assert data["queue_stats"]["total_items"] == 5
     
-    def test_serve_index_without_static_files(self, test_client, mock_queue_manager):
-        """Test serving index when static files don't exist."""
+    def test_serve_index_with_static_files(self, test_client, mock_queue_manager):
+        """Test serving index HTML file."""
         response = test_client.get("/")
         
         assert response.status_code == 200
-        data = response.json()
-        assert "Web UI not yet implemented" in data["message"]
+        assert response.headers["content-type"] == "text/html; charset=utf-8"
+        assert "<!DOCTYPE html>" in response.text
+        assert "YouTube to Notion Queue" in response.text
 
 
 class TestWebServerInitialization:
