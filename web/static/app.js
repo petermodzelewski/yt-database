@@ -21,11 +21,12 @@ class YouTubeNotionApp {
         this.components.queueColumns = new QueueColumns();
         this.components.urlInput = new UrlInput();
         this.components.chatLogModal = new ChatLogModal();
+        this.components.sseConnection = new SSEConnection(this);
         
         // Setup main event listeners
         this.setupEventListeners();
         
-        // Initial render
+        // Initial render (will be updated by SSE connection)
         this.updateQueueDisplay({ todo: [], 'in-progress': [], done: [] });
     }
 
@@ -78,9 +79,8 @@ class YouTubeNotionApp {
             
             console.log('URL added successfully:', result);
             
-            // Refresh queue display after successful addition
-            // This will be implemented in task 9 with real-time updates
-            // For now, we could manually refresh the queue status
+            // SSE connection will automatically update the UI
+            // No need to manually refresh queue status
             
             return result;
             
@@ -117,11 +117,51 @@ class YouTubeNotionApp {
     getComponent(name) {
         return this.components[name] || null;
     }
+
+    /**
+     * Get connection status from SSE component
+     * @returns {Object} Connection statistics
+     */
+    getConnectionStatus() {
+        return this.components.sseConnection ? this.components.sseConnection.getStats() : null;
+    }
+
+    /**
+     * Manually trigger reconnection
+     */
+    reconnect() {
+        if (this.components.sseConnection) {
+            this.components.sseConnection.reconnect();
+        }
+    }
+
+    /**
+     * Cleanup when app is destroyed
+     */
+    destroy() {
+        console.log('YouTube to Notion App: Cleaning up');
+        
+        // Cleanup all components
+        Object.values(this.components).forEach(component => {
+            if (component && typeof component.destroy === 'function') {
+                component.destroy();
+            }
+        });
+        
+        this.components = {};
+    }
 }
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new YouTubeNotionApp();
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (window.app && typeof window.app.destroy === 'function') {
+        window.app.destroy();
+    }
 });
 
 // Export for testing purposes

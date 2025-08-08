@@ -23,6 +23,13 @@ global.ChatLogModal = jest.fn().mockImplementation(() => ({
     show: jest.fn(),
     hide: jest.fn()
 }));
+global.SSEConnection = jest.fn().mockImplementation(() => ({
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    getStats: jest.fn(() => ({ isConnected: true })),
+    reconnect: jest.fn(),
+    destroy: jest.fn()
+}));
 
 describe('YouTubeNotionApp', () => {
     let app;

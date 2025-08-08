@@ -747,6 +747,181 @@ body {
   }
 }
 
+/* Connection Status Indicator */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.connection-indicator.connected {
+  color: var(--status-done);
+  background-color: rgba(0, 161, 82, 0.1);
+}
+
+.connection-indicator.disconnected {
+  color: var(--status-error);
+  background-color: rgba(211, 47, 47, 0.1);
+}
+
+.connection-indicator .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.connection-indicator.connected .status-dot {
+  background-color: var(--status-done);
+  animation: pulse-green 2s infinite;
+}
+
+.connection-indicator.disconnected .status-dot {
+  background-color: var(--status-error);
+  animation: pulse-red 2s infinite;
+}
+
+/* Enhanced Item Animations */
+.queue-item {
+  transition: all var(--transition-medium);
+  will-change: transform, opacity;
+}
+
+.queue-item.moving {
+  z-index: 10;
+  box-shadow: var(--shadow-heavy);
+}
+
+.queue-item.fade-out {
+  opacity: 0;
+  transform: translateX(20px) scale(0.95);
+}
+
+.queue-item.fade-in {
+  opacity: 0;
+  transform: translateX(-20px) scale(0.95);
+}
+
+.queue-item.slide-in {
+  animation: slideIn 0.3s ease forwards;
+}
+
+.queue-item.slide-out {
+  animation: slideOut 0.3s ease forwards;
+}
+
+/* Column transition effects */
+.column-content {
+  transition: all var(--transition-medium);
+}
+
+.column-content.updating {
+  opacity: 0.8;
+}
+
+/* Enhanced Animations */
+@keyframes pulse-green {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(1.1);
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.5; 
+    transform: scale(1.1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px) scale(0.95);
+  }
+}
+
+@keyframes itemMove {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(10px) scale(0.98);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Smooth column updates */
+.queue-column.updating .column-content {
+  transition: opacity var(--transition-medium);
+  opacity: 0.9;
+}
+
+/* Real-time update indicators */
+.item-updated {
+  animation: itemHighlight 1s ease;
+}
+
+@keyframes itemHighlight {
+  0% { background-color: var(--yt-bg-primary); }
+  50% { background-color: rgba(255, 215, 0, 0.2); }
+  100% { background-color: var(--yt-bg-primary); }
+}
+
+/* Loading states for real-time updates */
+.queue-item.updating {
+  position: relative;
+  overflow: hidden;
+}
+
+.queue-item.updating::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
 /* Dark mode support (future enhancement) */
 @media (prefers-color-scheme: dark) {
   :root {
