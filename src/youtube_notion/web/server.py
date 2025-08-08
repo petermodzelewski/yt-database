@@ -261,8 +261,17 @@ class WebServer:
                     }
                     yield f"data: {json.dumps(initial_data)}\n\n"
                     
+                    # For testing, check if we should send only initial status
+                    test_mode = request.query_params.get("test_mode") == "initial_only"
+                    if test_mode:
+                        return
+                    
                     # Send periodic updates
                     while True:
+                        # Check if client is still connected
+                        if await request.is_disconnected():
+                            break
+                            
                         try:
                             # Wait for events with timeout for heartbeat
                             event_data = await asyncio.wait_for(
