@@ -13,6 +13,7 @@ from fastapi.responses import PlainTextResponse, FileResponse
 import os
 import webbrowser
 from threading import Timer
+from typing import List
 
 app = FastAPI()
 
@@ -27,11 +28,16 @@ async def read_index():
     return FileResponse(os.path.join(static_dir, 'index.html'))
 
 url_queue = UrlQueue()
+active_connections: List[WebSocket] = []
 
-async def process_urls(websocket: WebSocket):
+async def broadcast(message: dict):
+    for connection in active_connections:
+        await connection.send_json(message)
+
+async def process_urls():
     config = load_application_config(youtube_mode=True)
     if not config:
-        await websocket.send_json({"status": "failed", "error": "Server configuration error."})
+        await broadcast({"status": "failed", "error": "Server configuration error."})
         return
 
     factory = ComponentFactory(config)
@@ -47,7 +53,7 @@ async def process_urls(websocket: WebSocket):
             url = url_queue.get_nowait()
 
             async def status_callback(message: str, progress: int):
-                await websocket.send_json({
+                await broadcast({
                     "status": "processing",
                     "url": url,
                     "message": message,
@@ -64,24 +70,29 @@ async def process_urls(websocket: WebSocket):
                     status_callback=status_callback
                 )
                 if success:
-                    await websocket.send_json({"status": "done", "url": url, "progress": 100, "metadata": metadata})
+                    await broadcast({"status": "done", "url": url, "progress": 100, "metadata": metadata})
                 else:
-                    await websocket.send_json({"status": "failed", "url": url, "error": "Processing failed."})
+                    await broadcast({"status": "failed", "url": url, "error": "Processing failed."})
             except Exception as e:
-                await websocket.send_json({"status": "failed", "url": url, "error": str(e)})
+                await broadcast({"status": "failed", "url": url, "error": str(e)})
         except queue.Empty:
             await asyncio.sleep(1)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(process_urls())
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    asyncio.create_task(process_urls(websocket))
+    active_connections.append(websocket)
     try:
         while True:
             data = await websocket.receive_text()
             url_queue.add(data)
-            await websocket.send_json({"status": "queued", "url": data})
+            await broadcast({"status": "queued", "url": data})
     except WebSocketDisconnect:
+        active_connections.remove(websocket)
         print("Client disconnected")
 
 @app.get("/logs/{video_id}")
