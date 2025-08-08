@@ -9,7 +9,7 @@ from src.youtube_notion.processors.video_processor import VideoProcessor
 from src.youtube_notion.config import load_application_config
 from src.youtube_notion.utils.chat_logger import ChatLogger
 from src.youtube_notion.queue import UrlQueue
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, FileResponse
 import os
 import webbrowser
 from threading import Timer
@@ -20,8 +20,11 @@ app = FastAPI()
 current_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(current_dir, "static")
 
-# Mount the static files directory
-app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/")
+async def read_index():
+    return FileResponse(os.path.join(static_dir, 'index.html'))
 
 url_queue = UrlQueue()
 
