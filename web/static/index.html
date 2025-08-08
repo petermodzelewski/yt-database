@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to Notion - Queue Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <span class="youtube-icon">▶</span>
+                    YouTube to Notion Queue
+                </h1>
+                <div class="header-stats">
+                    <span class="stat-item">
+                        <span class="stat-label">Total:</span>
+                        <span class="stat-value" id="total-count">0</span>
+                    </span>
+                    <span class="stat-item">
+                        <span class="stat-label">Processing:</span>
+                        <span class="stat-value" id="processing-count">0</span>
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <main class="queue-container">
+            <div class="queue-columns">
+                <!-- To Do Column -->
+                <div class="queue-column" data-status="todo">
+                    <div class="column-header">
+                        <h2 class="column-title">
+                            <span class="column-icon">📋</span>
+                            To Do
+                            <span class="item-count" id="todo-count">0</span>
+                        </h2>
+                        <button class="add-url-btn" id="add-url-btn" title="Add YouTube URL">
+                            <span class="plus-icon">+</span>
+                        </button>
+                    </div>
+                    <div class="column-content" id="todo-items">
+                        <!-- Queue items will be dynamically inserted here -->
+                    </div>
+                </div>
+
+                <!-- In Progress Column -->
+                <div class="queue-column" data-status="in-progress">
+                    <div class="column-header">
+                        <h2 class="column-title">
+                            <span class="column-icon">⚡</span>
+                            In Progress
+                            <span class="item-count" id="in-progress-count">0</span>
+                        </h2>
+                    </div>
+                    <div class="column-content" id="in-progress-items">
+                        <!-- Queue items will be dynamically inserted here -->
+                    </div>
+                </div>
+
+                <!-- Done Column -->
+                <div class="queue-column" data-status="done">
+                    <div class="column-header">
+                        <h2 class="column-title">
+                            <span class="column-icon">✅</span>
+                            Done
+                            <span class="item-count" id="done-count">0</span>
+                        </h2>
+                    </div>
+                    <div class="column-content" id="done-items">
+                        <!-- Queue items will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- URL Input Modal -->
+        <div class="modal-overlay" id="url-modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add YouTube URL</h3>
+                    <button class="modal-close" id="modal-close-btn">&times;</button>
+                </div>
+                <form class="url-form" id="url-form">
+                    <div class="form-group">
+                        <label for="youtube-url" class="form-label">YouTube URL</label>
+                        <input 
+                            type="url" 
+                            id="youtube-url" 
+                            name="url" 
+                            class="form-input" 
+                            placeholder="https://youtu.be/..." 
+                            required
+                        >
+                        <div class="form-error" id="url-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="custom-prompt" class="form-label">Custom Prompt (Optional)</label>
+                        <textarea 
+                            id="custom-prompt" 
+                            name="customPrompt" 
+                            class="form-textarea" 
+                            placeholder="Enter custom instructions for AI summary..."
+                            rows="3"
+                        ></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
+                            <span class="btn-text">Add to Queue</span>
+                            <span class="btn-spinner" style="display: none;">⟳</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Chat Log Modal -->
+        <div class="modal-overlay" id="chat-modal-overlay">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="chat-modal-title">Processing Log</h3>
+                    <button class="modal-close" id="chat-modal-close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="chat-log-content" id="chat-log-content">
+                        <!-- Chat log content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
