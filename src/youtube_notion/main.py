@@ -12,7 +12,8 @@ from typing import Optional, Dict, Any
 from .config.example_data import EXAMPLE_DATA
 from .config import (
     ApplicationConfig,
-    print_configuration_error
+    print_configuration_error,
+    load_application_config
 )
 from .config.factory import ComponentFactory
 from .processors.video_processor import VideoProcessor
@@ -29,25 +30,7 @@ from .utils.exceptions import (
 )
 
 
-def load_application_config(youtube_mode: bool = False) -> Optional[ApplicationConfig]:
-    """
-    Load and validate application configuration.
-    
-    Args:
-        youtube_mode: Whether YouTube processing mode is enabled
-        
-    Returns:
-        ApplicationConfig: Validated configuration or None if validation fails
-    """
-    try:
-        return ApplicationConfig.from_environment(youtube_mode)
-    except ConfigurationError as e:
-        print_configuration_error(e, youtube_mode)
-        return None
-
-
-
-def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig, batch_mode: bool = False) -> bool:
+def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[str], config: ApplicationConfig, batch_mode: bool = False, status_callback: Optional[callable] = None) -> tuple[bool, Optional[dict]]:
     """
     Process a YouTube video using the complete VideoProcessor orchestrator.
     
@@ -60,9 +43,10 @@ def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[st
         custom_prompt: Optional custom prompt for AI generation
         config: Application configuration
         batch_mode: If True, reduces verbose output for batch processing
+        status_callback: Optional callback for status updates
         
     Returns:
-        bool: True if processing completed successfully, False otherwise
+        tuple[bool, Optional[dict]]: A tuple containing the success status and the extracted metadata
     """
     try:
         # Create component factory from configuration
@@ -84,7 +68,7 @@ def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[st
                 print("Using custom prompt for AI summary generation")
         
         # Process video and get success status
-        success = processor.process_video(youtube_url, custom_prompt)
+        success, metadata = processor.process_video(youtube_url, custom_prompt, status_callback)
         
         if success:
             if not batch_mode:
@@ -94,7 +78,7 @@ def process_video_with_orchestrator(youtube_url: str, custom_prompt: Optional[st
         else:
             print("Error: Video processing failed")
         
-        return success
+        return success, metadata
         
     except VideoProcessingError as e:
         print(f"Error: Video processing failed - {e}")

@@ -16,6 +16,7 @@ from .settings import (
 )
 from .constants import DEFAULT_SUMMARY_PROMPT
 from .factory import ComponentFactory
+from .core import load_application_config
 
 __all__ = [
     'ApplicationConfig',
@@ -26,5 +27,6 @@ __all__ = [
     'get_configuration_help',
     'print_configuration_error',
     'load_custom_prompt',
-    'ComponentFactory'
+    'ComponentFactory',
+    'load_application_config'
 ]

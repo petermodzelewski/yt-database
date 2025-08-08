@@ -7,6 +7,7 @@ This script provides argument parsing for YouTube URL processing and example dat
 import argparse
 import sys
 from src.youtube_notion.main import main
+from src.youtube_notion.ui.server import start_server
 
 def parse_arguments():
     """Parse command-line arguments for the YouTube to Notion integration."""
@@ -50,6 +51,12 @@ Examples:
         help="Use example data mode (default behavior)"
     )
     
+    input_group.add_argument(
+        "--ui",
+        action="store_true",
+        help="Start in UI mode"
+    )
+
     parser.add_argument(
         "--prompt",
         type=str,
@@ -79,6 +86,11 @@ def main_cli():
     """Main CLI function that handles argument parsing and delegates to appropriate mode."""
     args = parse_arguments()
     
+    if args.ui:
+        print("Starting in UI mode...")
+        start_server()
+        return
+
     # Validate arguments
     if args.prompt and not args.url:
         print("Error: --prompt can only be used with single --url", file=sys.stderr)
@@ -102,9 +114,14 @@ def main_cli():
         if not urls:
             print("Error: No URLs found in file", file=sys.stderr)
             sys.exit(1)
-    else:
-        # Example data mode (default or explicitly requested)
+    elif args.example_data:
+        # Example data mode (explicitly requested)
         main()
+        return
+    else:
+        # Default to UI mode if no other arguments are provided
+        print("No input specified. Starting in UI mode by default...")
+        start_server()
         return
     
     # Process URLs

@@ -57,7 +57,7 @@ class VideoProcessor:
         self.summary_writer = summary_writer
         self.storage = storage
     
-    def process_video(self, video_url: str, custom_prompt: Optional[str] = None) -> bool:
+    def process_video(self, video_url: str, custom_prompt: Optional[str] = None, status_callback: Optional[callable] = None) -> tuple[bool, Optional[dict]]:
         """
         Process a video through the complete pipeline.
         
@@ -69,9 +69,10 @@ class VideoProcessor:
         Args:
             video_url: YouTube URL to process
             custom_prompt: Optional custom prompt for summary generation
+            status_callback: Optional callback function for status updates
             
         Returns:
-            bool: True if processing completed successfully, False otherwise
+            tuple[bool, Optional[dict]]: A tuple containing the success status and the extracted metadata
             
         Raises:
             VideoProcessingError: If any step in the pipeline fails
@@ -85,16 +86,23 @@ class VideoProcessor:
                 details=f"Received: {type(video_url).__name__}"
             )
         
+        def _update_status(message: str, progress: int):
+            if status_callback:
+                status_callback(message, progress)
+
         try:
             # Step 1: Extract metadata
+            _update_status("Extracting metadata...", 10)
             metadata = self.metadata_extractor.extract_metadata(video_url)
             
             # Step 2: Generate summary
+            _update_status("Generating summary...", 40)
             summary = self.summary_writer.generate_summary(
-                video_url, metadata, custom_prompt
+                video_url, metadata, custom_prompt, status_callback=status_callback
             )
             
             # Step 3: Prepare data for storage
+            _update_status("Preparing data for Notion...", 80)
             video_data = {
                 "Title": metadata.get("title", "Unknown Title"),
                 "Channel": metadata.get("channel", "Unknown Channel"),
@@ -112,6 +120,7 @@ class VideoProcessor:
                 video_data["Video ID"] = metadata["video_id"]
             
             # Step 4: Store results
+            _update_status("Saving to Notion...", 90)
             success = self.storage.store_video_summary(video_data)
             
             if not success:
@@ -120,11 +129,11 @@ class VideoProcessor:
                     details=f"Video: {metadata.get('title', 'Unknown')}"
                 )
             
-            return True
+            return True, metadata
             
-        except (MetadataExtractionError, SummaryGenerationError, StorageError):
+        except (MetadataExtractionError, SummaryGenerationError, StorageError) as e:
             # Re-raise specific errors as-is
-            raise
+            raise e
             
         except Exception as e:
             # Wrap unexpected errors in a general processing error

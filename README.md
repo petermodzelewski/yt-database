@@ -205,6 +205,17 @@ python youtube_notion_cli.py
 python youtube_notion_cli.py --example-data
 ```
 
+#### UI Mode
+
+Launch a web-based UI to manage video processing:
+
+```bash
+# Launch the UI
+python youtube_notion_cli.py --ui
+```
+
+The UI provides a drag-and-drop interface with three columns: "To Do", "In Progress", and "Done". You can add new YouTube URLs to the queue, and the UI will update in real-time as they are processed. You can also view the chat logs for completed videos.
+
 #### Command-Line Options
 
 | Option | Description | Example |
@@ -212,6 +223,7 @@ python youtube_notion_cli.py --example-data
 | `--url URL` | Process a single YouTube video URL | `--url "https://youtu.be/abc123"` |
 | `--urls URLS` | Process multiple URLs (comma-separated) | `--urls "url1,url2,url3"` |
 | `--file FILE` | Process URLs from file (one per line) | `--file urls.txt` |
+| `--ui` | Launch the web-based UI | `--ui` |
 | `--example-data` | Use built-in example data (default) | `--example-data` |
 | `--prompt TEXT` | Custom AI prompt (only with single --url) | `--prompt "Summarize key points"` |
 | `--help` | Show help message and exit | `--help` |
