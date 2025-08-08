@@ -49,6 +49,15 @@ class UrlInput {
         if (this.urlInput) {
             DOMUtils.addEventListener(this.urlInput, 'input', () => {
                 this.clearError();
+                this.validateInputRealTime();
+            });
+            
+            DOMUtils.addEventListener(this.urlInput, 'paste', () => {
+                // Clear error and validate after paste
+                setTimeout(() => {
+                    this.clearError();
+                    this.validateInputRealTime();
+                }, 10);
             });
         }
 
@@ -60,6 +69,19 @@ class UrlInput {
                 }
             });
         }
+
+        // Keyboard shortcuts
+        DOMUtils.addEventListener(document, 'keydown', (e) => {
+            if (this.modal && this.modal.classList.contains('active')) {
+                if (e.key === 'Escape') {
+                    this.hide();
+                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    // Ctrl+Enter or Cmd+Enter to submit
+                    e.preventDefault();
+                    this.handleSubmit();
+                }
+            }
+        });
     }
 
     /**
@@ -125,13 +147,26 @@ class UrlInput {
     }
 
     /**
-     * Validate YouTube URL format
+     * Validate YouTube URL format using comprehensive regex patterns
      * @param {string} url - URL to validate
      * @returns {boolean}
      */
     validateUrl(url) {
-        const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)[a-zA-Z0-9_-]{11}/;
-        return youtubeRegex.test(url);
+        // Comprehensive YouTube URL patterns
+        const youtubePatterns = [
+            // Standard watch URLs
+            /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]{11}(&.*)?$/,
+            // Short URLs
+            /^https?:\/\/youtu\.be\/[a-zA-Z0-9_-]{11}(\?.*)?$/,
+            // Embed URLs
+            /^https?:\/\/(www\.)?youtube\.com\/embed\/[a-zA-Z0-9_-]{11}(\?.*)?$/,
+            // Mobile URLs
+            /^https?:\/\/m\.youtube\.com\/watch\?v=[a-zA-Z0-9_-]{11}(&.*)?$/,
+            // YouTube Music URLs
+            /^https?:\/\/music\.youtube\.com\/watch\?v=[a-zA-Z0-9_-]{11}(&.*)?$/
+        ];
+        
+        return youtubePatterns.some(pattern => pattern.test(url));
     }
 
     /**
@@ -175,6 +210,43 @@ class UrlInput {
             }
         }
     }
+
+    /**
+     * Validate input in real-time and provide visual feedback
+     */
+    validateInputRealTime() {
+        if (!this.urlInput) return;
+        
+        const url = this.urlInput.value.trim();
+        
+        if (url && !this.validateUrl(url)) {
+            this.urlInput.style.borderColor = '#d32f2f';
+        } else {
+            this.urlInput.style.borderColor = '';
+        }
+    }
+
+    /**
+     * Extract video ID from YouTube URL for additional validation
+     * @param {string} url - YouTube URL
+     * @returns {string|null} - Video ID or null if not found
+     */
+    extractVideoId(url) {
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
+            /music\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) {
+                return match[1];
+            }
+        }
+        
+        return null;
+    }
 }
 
 // Export for module systems
@@ -182,5 +254,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = UrlInput;
 }
 
-// Make available globally
-window.UrlInput = UrlInput;
+// Make available globally for browser
+if (typeof window !== 'undefined') {
+    window.UrlInput = UrlInput;
+}

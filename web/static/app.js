@@ -40,14 +40,54 @@ class YouTubeNotionApp {
     }
 
     /**
-     * Add URL to queue (placeholder for task 8)
+     * Add URL to queue with API call
      * @param {string} url - YouTube URL
      * @param {string|null} customPrompt - Custom prompt
      */
     async addQueueItem(url, customPrompt = null) {
-        console.log('addQueueItem called - to be implemented in task 8', { url, customPrompt });
-        // TODO: Implement URL validation and API call in task 8
-        throw new Error('URL submission functionality will be implemented in task 8');
+        console.log('Adding URL to queue:', { url, customPrompt });
+        
+        try {
+            const requestBody = {
+                url: url
+            };
+            
+            // Add custom prompt if provided
+            if (customPrompt) {
+                requestBody.custom_prompt = customPrompt;
+            }
+            
+            const response = await fetch('/api/queue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to add URL to queue');
+            }
+            
+            console.log('URL added successfully:', result);
+            
+            // Refresh queue display after successful addition
+            // This will be implemented in task 9 with real-time updates
+            // For now, we could manually refresh the queue status
+            
+            return result;
+            
+        } catch (error) {
+            console.error('Failed to add URL to queue:', error);
+            throw error;
+        }
     }
 
     /**
@@ -87,4 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // Export for testing purposes
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = YouTubeNotionApp;
+}
+
+// Make available globally for browser
+if (typeof window !== 'undefined') {
+    window.YouTubeNotionApp = YouTubeNotionApp;
 }

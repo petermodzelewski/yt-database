@@ -552,6 +552,16 @@ body {
   box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.1);
 }
 
+.form-input.invalid {
+  border-color: var(--status-error);
+  box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.1);
+}
+
+.form-input.valid {
+  border-color: var(--status-done);
+  box-shadow: 0 0 0 2px rgba(0, 161, 82, 0.1);
+}
+
 .form-textarea {
   resize: vertical;
   min-height: 80px;

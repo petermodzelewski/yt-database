@@ -97,7 +97,12 @@
   - Set up event handling and DOM manipulation utilities
   - _Requirements: 2.1, 3.1, 5.1, 9.1_
 
-- [ ] 8. Add URL input functionality with validation
+- [x] 8. Add URL input functionality with validation
+
+
+
+
+
   - Implement "+" button next to To Do column that opens input popup
   - Create URL validation on frontend using regex patterns
   - Add form submission handling with error display
