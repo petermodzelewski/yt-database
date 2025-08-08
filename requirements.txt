@@ -6,3 +6,5 @@ google-api-python-client>=2.0.0
 requests>=2.25.0
 hypothesis
 beautifulsoup4
+fastapi
+uvicorn

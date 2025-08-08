@@ -83,7 +83,8 @@ class GeminiSummaryWriter(SummaryWriter):
         self.chat_logger = chat_logger or ChatLogger()
     
     def generate_summary(self, video_url: str, video_metadata: Dict[str, Any],
-                         custom_prompt: Optional[str] = None) -> str:
+                         custom_prompt: Optional[str] = None,
+                         status_callback: Optional[callable] = None) -> str:
         """
         Generate a markdown summary for the video using Gemini AI.
         
@@ -91,6 +92,7 @@ class GeminiSummaryWriter(SummaryWriter):
             video_url: YouTube URL to process
             video_metadata: Video metadata (title, channel, description, etc.)
             custom_prompt: Optional custom prompt for generation
+            status_callback: Optional callback for status updates
             
         Returns:
             str: Markdown summary with timestamps and rich formatting
@@ -110,9 +112,9 @@ class GeminiSummaryWriter(SummaryWriter):
 
         try:
             if duration_seconds > MAX_VIDEO_DURATION_SECONDS:
-                response = self._generate_summary_for_long_video(video_url, video_metadata, prompt)
+                response = self._generate_summary_for_long_video(video_url, video_metadata, prompt, status_callback)
             else:
-                response = self._api_call_with_retry(self._call_gemini_api, video_url, prompt)
+                response = self._api_call_with_retry(self._call_gemini_api, video_url, prompt, status_callback=status_callback)
 
             # Log the chat conversation
             try:
@@ -140,7 +142,7 @@ class GeminiSummaryWriter(SummaryWriter):
                 details=f"Video URL: {video_url}, Error type: {type(e).__name__}"
             )
 
-    def _generate_summary_for_long_video(self, video_url: str, video_metadata: Dict[str, Any], prompt: str) -> str:
+    def _generate_summary_for_long_video(self, video_url: str, video_metadata: Dict[str, Any], prompt: str, status_callback: Optional[callable] = None) -> str:
         """
         Generate a summary for a long video by splitting it into chunks and processing them sequentially.
         """
@@ -149,7 +151,9 @@ class GeminiSummaryWriter(SummaryWriter):
 
         full_summary = ""
         for i, (start, end) in enumerate(splits):
-            print(f"Processing video chunk {i+1}/{len(splits)}: {start}s - {end}s")
+            if status_callback:
+                progress = 40 + int(40 * (i / len(splits)))
+                status_callback(f"Summarizing chunk {i+1}/{len(splits)}...", progress)
 
             if i == 0:
                 chunk_prompt = f"This is the first part of a video. {prompt}"
@@ -167,7 +171,8 @@ class GeminiSummaryWriter(SummaryWriter):
                 video_url,
                 chunk_prompt,
                 start_offset=f"{start}s",
-                end_offset=f"{end}s"
+                end_offset=f"{end}s",
+                status_callback=status_callback
             )
 
             # Log the chat for the current chunk
@@ -407,7 +412,7 @@ class GeminiSummaryWriter(SummaryWriter):
         Args:
             api_func: The API function to call
             *args: Arguments to pass to the API function
-            **kwargs: Keyword arguments to pass to the API function
+            **kwargs: Keyword arguments to pass to the API function (may include status_callback)
             
         Returns:
             The result of the API function call
@@ -416,6 +421,7 @@ class GeminiSummaryWriter(SummaryWriter):
             APIError: If all retry attempts fail
             QuotaExceededError: If quota is exceeded (with retry logic)
         """
+        status_callback = kwargs.pop('status_callback', None)
         last_exception = None
         retry_count = 0
         
@@ -436,9 +442,13 @@ class GeminiSummaryWriter(SummaryWriter):
                     if is_test_mode:
                         # In test mode, cap retry delay to 5 seconds maximum
                         retry_delay = min(base_delay, 5)
+                        if status_callback:
+                            status_callback(f"API quota exceeded. Retrying in {retry_delay}s...", 50)
                         print(f"API quota exceeded. Test mode: waiting {retry_delay}s (capped from {base_delay}s) before retry (attempt {attempt + 1}/{self.max_retries})...")
                     else:
                         retry_delay = base_delay
+                        if status_callback:
+                            status_callback(f"API quota exceeded. Retrying in {retry_delay}s...", 50)
                         print(f"API quota exceeded. Waiting {retry_delay} seconds before retry (attempt {attempt + 1}/{self.max_retries})...")
                     
                     time.sleep(retry_delay)

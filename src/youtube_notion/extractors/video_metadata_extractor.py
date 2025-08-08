@@ -47,6 +47,7 @@ class VideoMetadataExtractor:
             ConfigurationError: If configuration parameters are invalid
         """
         # Validate configuration parameters
+        print("Initializing VideoMetadataExtractor")
         if timeout_seconds <= 0:
             raise ConfigurationError(
                 "Timeout seconds must be positive",
@@ -55,6 +56,7 @@ class VideoMetadataExtractor:
         
         self.youtube_api_key = youtube_api_key
         self.timeout_seconds = timeout_seconds
+        print("VideoMetadataExtractor initialized")
     
     def validate_configuration(self) -> bool:
         """

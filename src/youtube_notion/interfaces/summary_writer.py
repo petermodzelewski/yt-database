@@ -14,7 +14,8 @@ class SummaryWriter(ABC):
     
     @abstractmethod
     def generate_summary(self, video_url: str, video_metadata: Dict[str, Any], 
-                        custom_prompt: Optional[str] = None) -> str:
+                        custom_prompt: Optional[str] = None,
+                        status_callback: Optional[callable] = None) -> str:
         """
         Generate a markdown summary for the video.
         
@@ -22,6 +23,7 @@ class SummaryWriter(ABC):
             video_url: YouTube URL to process
             video_metadata: Video metadata (title, channel, description, etc.)
             custom_prompt: Optional custom prompt for generation
+            status_callback: Optional callback for status updates
             
         Returns:
             str: Markdown summary with timestamps and rich formatting
