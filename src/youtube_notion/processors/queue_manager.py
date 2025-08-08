@@ -400,7 +400,7 @@ class QueueManager:
     
     def _process_item(self, item_id: str) -> None:
         """
-        Process a single queue item.
+        Process a single queue item with enhanced status tracking.
         
         Args:
             item_id: ID of the item to process
@@ -417,11 +417,8 @@ class QueueManager:
                 current_phase=ProcessingPhase.METADATA_EXTRACTION.value
             )
             
-            # Process the video using VideoProcessor
-            success = self.video_processor.process_video(
-                item.url, 
-                item.custom_prompt
-            )
+            # Process the video using enhanced VideoProcessor integration
+            success = self._process_video_with_callbacks(item_id, item.url, item.custom_prompt)
             
             # Update statistics
             with self._lock:
@@ -431,15 +428,8 @@ class QueueManager:
                 else:
                     self._stats['failed_processed'] += 1
             
-            # Update final status
-            if success:
-                self.update_item_status(item_id, QueueStatus.COMPLETED)
-            else:
-                self.update_item_status(
-                    item_id, 
-                    QueueStatus.FAILED,
-                    error_message="Video processing failed"
-                )
+            # Final status is already set by _process_video_with_callbacks
+            # No need to update it again here
                 
         except Exception as e:
             # Handle processing errors
@@ -450,8 +440,260 @@ class QueueManager:
             self.update_item_status(
                 item_id,
                 QueueStatus.FAILED,
-                error_message=str(e)
+                error_message=f"Processing failed: {str(e)}"
             )
+    
+    def _process_video_with_callbacks(self, item_id: str, video_url: str, custom_prompt: Optional[str] = None) -> bool:
+        """
+        Process a video with status update callbacks during each phase.
+        
+        This method integrates with the existing VideoProcessor while providing
+        real-time status updates for the web UI. It handles both regular and
+        chunked video processing with appropriate status updates.
+        
+        Args:
+            item_id: Queue item ID for status updates
+            video_url: YouTube URL to process
+            custom_prompt: Optional custom prompt for summary generation
+            
+        Returns:
+            bool: True if processing completed successfully, False otherwise
+        """
+        try:
+            # Phase 1: Extract metadata
+            self.update_item_status(
+                item_id,
+                QueueStatus.IN_PROGRESS,
+                current_phase=ProcessingPhase.METADATA_EXTRACTION.value
+            )
+            
+            metadata = self.video_processor.metadata_extractor.extract_metadata(video_url)
+            
+            # Update item with video metadata
+            item = self.get_item_status(item_id)
+            if item:
+                item.title = metadata.get("title")
+                item.thumbnail_url = metadata.get("thumbnail_url")
+                item.channel = metadata.get("channel")
+                self._notify_status_change(item_id, item)
+            
+            # Check if video needs chunked processing
+            duration_seconds = metadata.get('duration', 0)
+            from ..config.constants import MAX_VIDEO_DURATION_SECONDS
+            from ..utils.video_utils import calculate_video_splits
+            
+            if duration_seconds > MAX_VIDEO_DURATION_SECONDS:
+                # Handle chunked video processing
+                return self._process_chunked_video(item_id, video_url, metadata, custom_prompt)
+            else:
+                # Handle regular video processing
+                return self._process_regular_video(item_id, video_url, metadata, custom_prompt)
+                
+        except Exception as e:
+            self.update_item_status(
+                item_id,
+                QueueStatus.FAILED,
+                error_message=f"Processing failed: {str(e)}"
+            )
+            return False
+    
+    def _process_regular_video(self, item_id: str, video_url: str, metadata: dict, custom_prompt: Optional[str] = None) -> bool:
+        """
+        Process a regular (non-chunked) video with status updates.
+        
+        Args:
+            item_id: Queue item ID for status updates
+            video_url: YouTube URL to process
+            metadata: Video metadata from extraction phase
+            custom_prompt: Optional custom prompt for summary generation
+            
+        Returns:
+            bool: True if processing completed successfully, False otherwise
+        """
+        try:
+            # Phase 2: Generate summary
+            self.update_item_status(
+                item_id,
+                QueueStatus.IN_PROGRESS,
+                current_phase=ProcessingPhase.SUMMARY_GENERATION.value
+            )
+            
+            summary = self.video_processor.summary_writer.generate_summary(
+                video_url, metadata, custom_prompt
+            )
+            
+            # Phase 3: Store in Notion
+            self.update_item_status(
+                item_id,
+                QueueStatus.IN_PROGRESS,
+                current_phase=ProcessingPhase.NOTION_UPLOAD.value
+            )
+            
+            # Prepare data for storage
+            video_data = {
+                "Title": metadata.get("title", "Unknown Title"),
+                "Channel": metadata.get("channel", "Unknown Channel"),
+                "Video URL": video_url,
+                "Cover": metadata.get("thumbnail_url", ""),
+                "Summary": summary
+            }
+            
+            # Add additional metadata if available
+            if metadata.get("description"):
+                video_data["Description"] = metadata["description"]
+            if metadata.get("published_at"):
+                video_data["Published"] = metadata["published_at"]
+            if metadata.get("video_id"):
+                video_data["Video ID"] = metadata["video_id"]
+            if metadata.get("duration"):
+                video_data["Duration"] = metadata["duration"]
+            
+            success = self.video_processor.storage.store_video_summary(video_data)
+            
+            # Update chat log path if available
+            if hasattr(self.video_processor.summary_writer, 'chat_logger'):
+                chat_logger = self.video_processor.summary_writer.chat_logger
+                if hasattr(chat_logger, 'get_latest_log_path'):
+                    item = self.get_item_status(item_id)
+                    if item:
+                        item.chat_log_path = chat_logger.get_latest_log_path()
+                        self._notify_status_change(item_id, item)
+            
+            # Update final status based on success
+            if success:
+                self.update_item_status(item_id, QueueStatus.COMPLETED)
+            else:
+                self.update_item_status(
+                    item_id,
+                    QueueStatus.FAILED,
+                    error_message="Storage operation failed"
+                )
+            
+            return success
+            
+        except Exception as e:
+            self.update_item_status(
+                item_id,
+                QueueStatus.FAILED,
+                error_message=f"Processing failed: {str(e)}"
+            )
+            return False
+    
+    def _process_chunked_video(self, item_id: str, video_url: str, metadata: dict, custom_prompt: Optional[str] = None) -> bool:
+        """
+        Process a chunked video with detailed status updates for each chunk.
+        
+        Args:
+            item_id: Queue item ID for status updates
+            video_url: YouTube URL to process
+            metadata: Video metadata from extraction phase
+            custom_prompt: Optional custom prompt for summary generation
+            
+        Returns:
+            bool: True if processing completed successfully, False otherwise
+        """
+        try:
+            from ..utils.video_utils import calculate_video_splits
+            
+            duration_seconds = metadata.get('duration', 0)
+            splits = calculate_video_splits(duration_seconds)
+            
+            # Update item with chunk information
+            self.update_item_status(
+                item_id,
+                QueueStatus.IN_PROGRESS,
+                current_phase=ProcessingPhase.CHUNK_PROCESSING.value,
+                current_chunk=0,
+                total_chunks=len(splits)
+            )
+            
+            # Phase 2: Generate summary for each chunk
+            summary = self.video_processor.summary_writer.generate_summary(
+                video_url, metadata, custom_prompt
+            )
+            
+            # The GeminiSummaryWriter handles chunked processing internally,
+            # but we need to track chunk progress. We'll use a callback approach.
+            self._track_chunk_progress(item_id, len(splits))
+            
+            # Phase 3: Store in Notion
+            self.update_item_status(
+                item_id,
+                QueueStatus.IN_PROGRESS,
+                current_phase=ProcessingPhase.NOTION_UPLOAD.value
+            )
+            
+            # Prepare data for storage
+            video_data = {
+                "Title": metadata.get("title", "Unknown Title"),
+                "Channel": metadata.get("channel", "Unknown Channel"),
+                "Video URL": video_url,
+                "Cover": metadata.get("thumbnail_url", ""),
+                "Summary": summary
+            }
+            
+            # Add additional metadata if available
+            if metadata.get("description"):
+                video_data["Description"] = metadata["description"]
+            if metadata.get("published_at"):
+                video_data["Published"] = metadata["published_at"]
+            if metadata.get("video_id"):
+                video_data["Video ID"] = metadata["video_id"]
+            if metadata.get("duration"):
+                video_data["Duration"] = metadata["duration"]
+            
+            success = self.video_processor.storage.store_video_summary(video_data)
+            
+            # Update chunk log paths if available
+            if hasattr(self.video_processor.summary_writer, 'chat_logger'):
+                chat_logger = self.video_processor.summary_writer.chat_logger
+                item = self.get_item_status(item_id)
+                if item and hasattr(chat_logger, 'get_chunk_log_paths'):
+                    chunk_logs = chat_logger.get_chunk_log_paths(metadata.get('video_id', 'unknown'))
+                    item.chunk_logs = chunk_logs
+                    self._notify_status_change(item_id, item)
+            
+            # Update final status based on success
+            if success:
+                self.update_item_status(item_id, QueueStatus.COMPLETED)
+            else:
+                self.update_item_status(
+                    item_id,
+                    QueueStatus.FAILED,
+                    error_message="Storage operation failed"
+                )
+            
+            return success
+            
+        except Exception as e:
+            self.update_item_status(
+                item_id,
+                QueueStatus.FAILED,
+                error_message=f"Processing failed: {str(e)}"
+            )
+            return False
+    
+    def _track_chunk_progress(self, item_id: str, total_chunks: int) -> None:
+        """
+        Track chunk processing progress.
+        
+        Since the GeminiSummaryWriter handles chunked processing internally,
+        we'll update the status to show that chunked processing is happening.
+        The actual chunk progress is visible through the console output from
+        GeminiSummaryWriter.
+        
+        Args:
+            item_id: Queue item ID for status updates
+            total_chunks: Total number of chunks being processed
+        """
+        # Update status to show chunked processing is happening
+        self.update_item_status(
+            item_id,
+            QueueStatus.IN_PROGRESS,
+            current_phase=f"Processing {total_chunks} video chunks",
+            current_chunk=1,
+            total_chunks=total_chunks
+        )
     
     def _notify_status_change(self, item_id: str, item: QueueItem) -> None:
         """

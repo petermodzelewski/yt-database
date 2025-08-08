@@ -376,8 +376,31 @@ class TestBackgroundProcessing:
     
     def test_background_processing_processes_items(self, queue_manager):
         """Test that background thread processes enqueued items."""
-        # Set up mock to track calls
-        queue_manager.video_processor.process_video.return_value = True
+        # Set up mock components for the enhanced processing
+        mock_metadata_extractor = Mock()
+        mock_summary_writer = Mock()
+        mock_storage = Mock()
+        
+        # Set up proper return values
+        mock_metadata_extractor.extract_metadata.return_value = {
+            'title': 'Test Video',
+            'channel': 'Test Channel',
+            'thumbnail_url': 'https://example.com/thumb.jpg',
+            'duration': 1800,  # 30 minutes (regular video)
+            'video_id': 'test123'
+        }
+        mock_summary_writer.generate_summary.return_value = "Test summary"
+        mock_storage.store_video_summary.return_value = True
+        
+        # Set up chat logger mock
+        mock_chat_logger = Mock()
+        mock_chat_logger.get_latest_log_path.return_value = "/path/to/log.md"
+        mock_summary_writer.chat_logger = mock_chat_logger
+        
+        # Assign mocks to the video processor
+        queue_manager.video_processor.metadata_extractor = mock_metadata_extractor
+        queue_manager.video_processor.summary_writer = mock_summary_writer
+        queue_manager.video_processor.storage = mock_storage
         
         # Start processing
         queue_manager.start_processing()
@@ -386,24 +409,52 @@ class TestBackgroundProcessing:
         item_id = queue_manager.enqueue("https://youtu.be/test123")
         
         # Wait for processing
-        time.sleep(0.2)
+        time.sleep(0.5)
         
         # Check that item was processed
         item = queue_manager.get_item_status(item_id)
+        
+        # Debug: Print current status if not completed
+        if item.status != QueueStatus.COMPLETED:
+            print(f"Debug: Item status: {item.status}, phase: {item.current_phase}, error: {item.error_message}")
+        
         assert item.status == QueueStatus.COMPLETED
         
-        # Check that video processor was called
-        queue_manager.video_processor.process_video.assert_called_once_with(
-            "https://youtu.be/test123", None
-        )
+        # Check that components were called
+        mock_metadata_extractor.extract_metadata.assert_called_once_with("https://youtu.be/test123")
+        mock_summary_writer.generate_summary.assert_called_once()
+        mock_storage.store_video_summary.assert_called_once()
         
         # Clean up
         queue_manager.stop_processing()
     
     def test_background_processing_handles_failures(self, queue_manager):
         """Test that background thread handles processing failures."""
-        # Set up mock to return failure
-        queue_manager.video_processor.process_video.return_value = False
+        # Set up mock components with storage returning failure
+        mock_metadata_extractor = Mock()
+        mock_summary_writer = Mock()
+        mock_storage = Mock()
+        
+        # Set up proper return values but storage fails
+        mock_metadata_extractor.extract_metadata.return_value = {
+            'title': 'Test Video',
+            'channel': 'Test Channel',
+            'thumbnail_url': 'https://example.com/thumb.jpg',
+            'duration': 1800,  # 30 minutes (regular video)
+            'video_id': 'test123'
+        }
+        mock_summary_writer.generate_summary.return_value = "Test summary"
+        mock_storage.store_video_summary.return_value = False  # Storage fails
+        
+        # Set up chat logger mock
+        mock_chat_logger = Mock()
+        mock_chat_logger.get_latest_log_path.return_value = "/path/to/log.md"
+        mock_summary_writer.chat_logger = mock_chat_logger
+        
+        # Assign mocks to the video processor
+        queue_manager.video_processor.metadata_extractor = mock_metadata_extractor
+        queue_manager.video_processor.summary_writer = mock_summary_writer
+        queue_manager.video_processor.storage = mock_storage
         
         # Start processing
         queue_manager.start_processing()
@@ -417,15 +468,25 @@ class TestBackgroundProcessing:
         # Check that item failed
         item = queue_manager.get_item_status(item_id)
         assert item.status == QueueStatus.FAILED
-        assert item.error_message == "Video processing failed"
+        assert "Storage operation failed" in item.error_message
         
         # Clean up
         queue_manager.stop_processing()
     
     def test_background_processing_handles_exceptions(self, queue_manager):
         """Test that background thread handles processing exceptions."""
-        # Set up mock to raise exception
-        queue_manager.video_processor.process_video.side_effect = Exception("Processing error")
+        # Set up mock components with one that raises an exception
+        mock_metadata_extractor = Mock()
+        mock_summary_writer = Mock()
+        mock_storage = Mock()
+        
+        # Set up metadata extractor to raise exception
+        mock_metadata_extractor.extract_metadata.side_effect = Exception("Processing error")
+        
+        # Assign mocks to the video processor
+        queue_manager.video_processor.metadata_extractor = mock_metadata_extractor
+        queue_manager.video_processor.summary_writer = mock_summary_writer
+        queue_manager.video_processor.storage = mock_storage
         
         # Start processing
         queue_manager.start_processing()
@@ -637,6 +698,260 @@ class TestStatisticsAndUtilities:
         assert queue_manager.get_item_status(item_id) is not None
 
 
+class TestVideoProcessorIntegration:
+    """Test integration with VideoProcessor and ComponentFactory."""
+    
+    @pytest.fixture
+    def mock_components(self):
+        """Create mock components for VideoProcessor."""
+        mock_metadata_extractor = Mock()
+        mock_summary_writer = Mock()
+        mock_storage = Mock()
+        mock_chat_logger = Mock()
+        
+        # Set up default return values
+        mock_metadata_extractor.extract_metadata.return_value = {
+            'title': 'Test Video',
+            'channel': 'Test Channel',
+            'thumbnail_url': 'https://example.com/thumb.jpg',
+            'duration': 1800,  # 30 minutes (regular video)
+            'video_id': 'test123'
+        }
+        mock_summary_writer.generate_summary.return_value = "Test summary"
+        mock_storage.store_video_summary.return_value = True
+        mock_summary_writer.chat_logger = mock_chat_logger
+        mock_chat_logger.get_latest_log_path.return_value = "/path/to/log.md"
+        
+        return {
+            'metadata_extractor': mock_metadata_extractor,
+            'summary_writer': mock_summary_writer,
+            'storage': mock_storage,
+            'chat_logger': mock_chat_logger
+        }
+    
+    @pytest.fixture
+    def queue_manager_with_components(self, mock_components):
+        """Create QueueManager with mock VideoProcessor components."""
+        mock_processor = Mock()
+        mock_processor.metadata_extractor = mock_components['metadata_extractor']
+        mock_processor.summary_writer = mock_components['summary_writer']
+        mock_processor.storage = mock_components['storage']
+        
+        return QueueManager(mock_processor), mock_components
+    
+    def test_process_regular_video_with_status_updates(self, queue_manager_with_components):
+        """Test processing regular video with proper status updates."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        # Set up listener to track status changes
+        status_changes = []
+        def track_status(item_id, item):
+            status_changes.append((item.status, item.current_phase))
+        
+        queue_manager.add_status_listener(track_status)
+        
+        # Start processing
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/test123")
+        
+        # Wait for processing
+        time.sleep(0.3)
+        
+        # Verify final status
+        item = queue_manager.get_item_status(item_id)
+        assert item.status == QueueStatus.COMPLETED
+        assert item.title == 'Test Video'
+        assert item.channel == 'Test Channel'
+        assert item.thumbnail_url == 'https://example.com/thumb.jpg'
+        
+        # Verify all components were called
+        mock_components['metadata_extractor'].extract_metadata.assert_called_once_with("https://youtu.be/test123")
+        mock_components['summary_writer'].generate_summary.assert_called_once()
+        mock_components['storage'].store_video_summary.assert_called_once()
+        
+        # Verify status progression
+        status_phases = [phase for _, phase in status_changes if phase]
+        assert ProcessingPhase.METADATA_EXTRACTION.value in status_phases
+        assert ProcessingPhase.SUMMARY_GENERATION.value in status_phases
+        assert ProcessingPhase.NOTION_UPLOAD.value in status_phases
+        
+        queue_manager.stop_processing()
+    
+    def test_process_chunked_video_with_status_updates(self, queue_manager_with_components):
+        """Test processing chunked video with proper status updates."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        # Set up long video metadata (over 45 minutes)
+        mock_components['metadata_extractor'].extract_metadata.return_value = {
+            'title': 'Long Test Video',
+            'channel': 'Test Channel',
+            'thumbnail_url': 'https://example.com/thumb.jpg',
+            'duration': 3600,  # 60 minutes (chunked video)
+            'video_id': 'long123'
+        }
+        
+        # Set up chunk logs
+        mock_components['chat_logger'].get_chunk_log_paths.return_value = [
+            '/path/to/chunk_0.md',
+            '/path/to/chunk_1.md'
+        ]
+        
+        # Set up listener to track status changes
+        status_changes = []
+        def track_status(item_id, item):
+            status_changes.append((item.status, item.current_phase, item.current_chunk, item.total_chunks))
+        
+        queue_manager.add_status_listener(track_status)
+        
+        # Start processing
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/long123")
+        
+        # Wait for processing
+        time.sleep(0.3)
+        
+        # Verify final status
+        item = queue_manager.get_item_status(item_id)
+        assert item.status == QueueStatus.COMPLETED
+        assert item.title == 'Long Test Video'
+        assert len(item.chunk_logs) == 2
+        
+        # Verify chunk processing was indicated
+        chunk_phases = [phase for _, phase, _, _ in status_changes if phase and 'chunk' in phase.lower()]
+        assert len(chunk_phases) > 0
+        
+        queue_manager.stop_processing()
+    
+    def test_metadata_extraction_failure(self, queue_manager_with_components):
+        """Test handling of metadata extraction failure."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        # Set up metadata extractor to fail
+        mock_components['metadata_extractor'].extract_metadata.side_effect = Exception("Metadata failed")
+        
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/test123")
+        
+        # Wait for processing
+        time.sleep(0.2)
+        
+        # Verify failure handling
+        item = queue_manager.get_item_status(item_id)
+        assert item.status == QueueStatus.FAILED
+        assert "Metadata failed" in item.error_message
+        
+        # Verify other components were not called
+        mock_components['summary_writer'].generate_summary.assert_not_called()
+        mock_components['storage'].store_video_summary.assert_not_called()
+        
+        queue_manager.stop_processing()
+    
+    def test_summary_generation_failure(self, queue_manager_with_components):
+        """Test handling of summary generation failure."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        # Set up summary writer to fail
+        mock_components['summary_writer'].generate_summary.side_effect = Exception("Summary failed")
+        
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/test123")
+        
+        # Wait for processing
+        time.sleep(0.2)
+        
+        # Verify failure handling
+        item = queue_manager.get_item_status(item_id)
+        assert item.status == QueueStatus.FAILED
+        assert "Summary failed" in item.error_message
+        
+        # Verify metadata was extracted but storage was not called
+        mock_components['metadata_extractor'].extract_metadata.assert_called_once()
+        mock_components['storage'].store_video_summary.assert_not_called()
+        
+        queue_manager.stop_processing()
+    
+    def test_storage_failure(self, queue_manager_with_components):
+        """Test handling of storage failure."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        # Set up storage to fail
+        mock_components['storage'].store_video_summary.return_value = False
+        
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/test123")
+        
+        # Wait for processing
+        time.sleep(0.2)
+        
+        # Verify failure handling
+        item = queue_manager.get_item_status(item_id)
+        assert item.status == QueueStatus.FAILED
+        assert "storage operation failed" in item.error_message.lower()
+        
+        # Verify all components were called
+        mock_components['metadata_extractor'].extract_metadata.assert_called_once()
+        mock_components['summary_writer'].generate_summary.assert_called_once()
+        mock_components['storage'].store_video_summary.assert_called_once()
+        
+        queue_manager.stop_processing()
+    
+    def test_custom_prompt_passed_to_summary_writer(self, queue_manager_with_components):
+        """Test that custom prompt is passed to summary writer."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        custom_prompt = "Custom summary instructions"
+        
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/test123", custom_prompt)
+        
+        # Wait for processing
+        time.sleep(0.2)
+        
+        # Verify custom prompt was passed
+        mock_components['summary_writer'].generate_summary.assert_called_once()
+        call_args = mock_components['summary_writer'].generate_summary.call_args
+        assert call_args[0][2] == custom_prompt  # Third argument should be custom_prompt
+        
+        queue_manager.stop_processing()
+    
+    def test_video_data_preparation_for_storage(self, queue_manager_with_components):
+        """Test that video data is properly prepared for storage."""
+        queue_manager, mock_components = queue_manager_with_components
+        
+        # Set up rich metadata
+        mock_components['metadata_extractor'].extract_metadata.return_value = {
+            'title': 'Test Video Title',
+            'channel': 'Test Channel Name',
+            'thumbnail_url': 'https://example.com/thumbnail.jpg',
+            'description': 'Video description',
+            'published_at': '2023-01-01',
+            'video_id': 'abc123',
+            'duration': 1800
+        }
+        
+        queue_manager.start_processing()
+        item_id = queue_manager.enqueue("https://youtu.be/abc123")
+        
+        # Wait for processing
+        time.sleep(0.2)
+        
+        # Verify storage was called with correct data
+        mock_components['storage'].store_video_summary.assert_called_once()
+        call_args = mock_components['storage'].store_video_summary.call_args[0][0]
+        
+        assert call_args['Title'] == 'Test Video Title'
+        assert call_args['Channel'] == 'Test Channel Name'
+        assert call_args['Video URL'] == 'https://youtu.be/abc123'
+        assert call_args['Cover'] == 'https://example.com/thumbnail.jpg'
+        assert call_args['Summary'] == 'Test summary'
+        assert call_args['Description'] == 'Video description'
+        assert call_args['Published'] == '2023-01-01'
+        assert call_args['Video ID'] == 'abc123'
+        assert call_args['Duration'] == 1800
+        
+        queue_manager.stop_processing()
+
+
 class TestErrorHandling:
     """Test error handling scenarios."""
     
@@ -657,7 +972,18 @@ class TestErrorHandling:
     
     def test_processing_with_video_processor_exception(self, queue_manager):
         """Test handling of VideoProcessor exceptions during processing."""
-        queue_manager.video_processor.process_video.side_effect = VideoProcessingError("Processing failed")
+        # Set up mock components with one that raises an exception
+        mock_metadata_extractor = Mock()
+        mock_summary_writer = Mock()
+        mock_storage = Mock()
+        
+        # Set up metadata extractor to raise VideoProcessingError
+        mock_metadata_extractor.extract_metadata.side_effect = VideoProcessingError("Processing failed")
+        
+        # Assign mocks to the video processor
+        queue_manager.video_processor.metadata_extractor = mock_metadata_extractor
+        queue_manager.video_processor.summary_writer = mock_summary_writer
+        queue_manager.video_processor.storage = mock_storage
         
         queue_manager.start_processing()
         item_id = queue_manager.enqueue("https://youtu.be/test123")

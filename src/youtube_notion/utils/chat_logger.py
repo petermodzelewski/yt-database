@@ -230,3 +230,59 @@ class ChatLogger:
         for log_file in self.log_directory.glob("*.md"):
             if log_file.stat().st_mtime < cutoff_time:
                 log_file.unlink()
+    
+    def get_latest_log_path(self, video_id: Optional[str] = None) -> Optional[str]:
+        """
+        Get the path to the most recent log file.
+        
+        Args:
+            video_id: Optional video ID to filter by
+            
+        Returns:
+            Optional[str]: Path to the latest log file, or None if no logs exist
+        """
+        log_files = self.get_log_files(video_id)
+        if not log_files:
+            return None
+        
+        # Sort by modification time (newest first)
+        latest_file = max(log_files, key=lambda f: f.stat().st_mtime)
+        return str(latest_file)
+    
+    def get_chunk_log_paths(self, video_id: str) -> list:
+        """
+        Get paths to all chunk log files for a specific video.
+        
+        Args:
+            video_id: YouTube video ID
+            
+        Returns:
+            list: List of chunk log file paths, sorted by chunk index
+        """
+        if not self.log_directory.exists():
+            return []
+        
+        # Find all chunk log files for this video
+        chunk_pattern = f"{video_id}_chunk_*.md"
+        chunk_files = list(self.log_directory.glob(chunk_pattern))
+        
+        if not chunk_files:
+            return []
+        
+        # Sort by chunk index (extract from filename)
+        def extract_chunk_index(filepath):
+            try:
+                # Extract chunk index from filename like "video_id_chunk_0_timestamp.md"
+                filename = filepath.stem
+                parts = filename.split('_')
+                chunk_idx = None
+                for i, part in enumerate(parts):
+                    if part == 'chunk' and i + 1 < len(parts):
+                        chunk_idx = int(parts[i + 1])
+                        break
+                return chunk_idx if chunk_idx is not None else 0
+            except (ValueError, IndexError):
+                return 0
+        
+        chunk_files.sort(key=extract_chunk_index)
+        return [str(f) for f in chunk_files]
