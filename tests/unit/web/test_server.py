@@ -6,8 +6,13 @@ TestClient for isolated testing without external dependencies.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+import asyncio
+import json
+import threading
+import time
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
+import httpx
 
 from src.youtube_notion.web.server import WebServer
 from src.youtube_notion.web.config import WebServerConfig
@@ -227,3 +232,380 @@ class TestWebServerLifecycle:
             success = server.stop(timeout=1.0)
             assert success
             assert not server.is_running
+
+
+class TestServerSentEvents:
+    """Test Server-Sent Events functionality for real-time updates."""
+    
+    @pytest.fixture
+    def mock_queue_manager(self):
+        """Create a mock queue manager with SSE support."""
+        from tests.fixtures.mock_implementations import MockQueueManager
+        return MockQueueManager()
+    
+    @pytest.fixture
+    def test_client(self, mock_queue_manager):
+        """Create a test client with mock queue manager."""
+        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
+        server = WebServer(mock_queue_manager, config)
+        return TestClient(server.app)
+    
+    @pytest.fixture
+    async def async_client(self, mock_queue_manager):
+        """Create an async HTTP client for SSE testing."""
+        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
+        server = WebServer(mock_queue_manager, config)
+        
+        async with httpx.AsyncClient(app=server.app, base_url="http://test") as client:
+            yield client
+    
+    def test_sse_endpoint_initial_status(self, test_client, mock_queue_manager):
+        """Test SSE endpoint returns initial queue status."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        # Add some mock items to the queue
+        mock_queue_manager.add_mock_item("item-1", "https://youtu.be/test1", QueueStatus.TODO)
+        mock_queue_manager.add_mock_item("item-2", "https://youtu.be/test2", QueueStatus.IN_PROGRESS)
+        mock_queue_manager.add_mock_item("item-3", "https://youtu.be/test3", QueueStatus.COMPLETED)
+        
+        # Connect to SSE endpoint
+        with test_client.stream("GET", "/events") as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+            assert response.headers["cache-control"] == "no-cache"
+            assert response.headers["connection"] == "keep-alive"
+            
+            # Read the first event (initial status)
+            lines = []
+            for line in response.iter_lines():
+                lines.append(line)
+                if line == "":  # Empty line indicates end of event
+                    break
+            
+            # Parse the event data
+            data_line = next((line for line in lines if line.startswith("data: ")), None)
+            assert data_line is not None
+            
+            event_data = json.loads(data_line[6:])  # Remove "data: " prefix
+            assert event_data["type"] == "queue_status"
+            assert "data" in event_data
+            assert "timestamp" in event_data
+            
+            # Verify queue status structure
+            queue_data = event_data["data"]
+            assert len(queue_data["todo"]) == 1
+            assert len(queue_data["in_progress"]) == 1
+            assert len(queue_data["completed"]) == 1
+            assert len(queue_data["failed"]) == 0
+            
+            assert queue_data["todo"][0]["id"] == "item-1"
+            assert queue_data["in_progress"][0]["id"] == "item-2"
+            assert queue_data["completed"][0]["id"] == "item-3"
+    
+    @pytest.mark.asyncio
+    async def test_sse_status_change_events(self, async_client, mock_queue_manager):
+        """Test that SSE broadcasts status change events."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        # Start SSE connection
+        async with async_client.stream("GET", "/events") as response:
+            assert response.status_code == 200
+            
+            # Read initial status event
+            initial_event = await self._read_sse_event(response)
+            assert initial_event["type"] == "queue_status"
+            
+            # Simulate status change by adding an item
+            item_id = mock_queue_manager._enqueue("https://youtu.be/newvideo")
+            
+            # Should receive a status change event
+            status_event = await self._read_sse_event(response)
+            assert status_event["type"] == "status_change"
+            assert status_event["data"]["item_id"] == item_id
+            assert status_event["data"]["item"]["url"] == "https://youtu.be/newvideo"
+            assert status_event["data"]["item"]["status"] == "todo"
+    
+    @pytest.mark.asyncio
+    async def test_sse_heartbeat_functionality(self, async_client, mock_queue_manager):
+        """Test SSE heartbeat functionality."""
+        # Start SSE connection
+        async with async_client.stream("GET", "/events") as response:
+            assert response.status_code == 200
+            
+            # Read initial status event
+            initial_event = await self._read_sse_event(response)
+            assert initial_event["type"] == "queue_status"
+            
+            # Wait for heartbeat (should come within heartbeat interval + some buffer)
+            heartbeat_event = await asyncio.wait_for(
+                self._read_sse_event(response), 
+                timeout=3.0  # Heartbeat interval is 1 second + buffer
+            )
+            assert heartbeat_event["type"] == "heartbeat"
+            assert "timestamp" in heartbeat_event
+    
+    @pytest.mark.asyncio
+    async def test_sse_connection_management(self, mock_queue_manager):
+        """Test SSE connection management and cleanup."""
+        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
+        server = WebServer(mock_queue_manager, config)
+        
+        # Initially no connections
+        assert len(server._sse_connections) == 0
+        
+        async with httpx.AsyncClient(app=server.app, base_url="http://test") as client:
+            # Start multiple SSE connections
+            async with client.stream("GET", "/events") as response1:
+                # Should have one connection
+                assert len(server._sse_connections) == 1
+                
+                async with client.stream("GET", "/events") as response2:
+                    # Should have two connections
+                    assert len(server._sse_connections) == 2
+                    
+                    # Read initial events from both connections
+                    event1 = await self._read_sse_event(response1)
+                    event2 = await self._read_sse_event(response2)
+                    
+                    assert event1["type"] == "queue_status"
+                    assert event2["type"] == "queue_status"
+                
+                # After second connection closes, should have one connection
+                # Note: Connection cleanup happens during event broadcasting
+                # so we need to trigger an event to clean up closed connections
+                mock_queue_manager._enqueue("https://youtu.be/trigger")
+                
+                # Read the status change event
+                await self._read_sse_event(response1)
+        
+        # After all connections close, should eventually have no connections
+        # Trigger another event to clean up
+        mock_queue_manager._enqueue("https://youtu.be/cleanup")
+        
+        # Give some time for cleanup
+        await asyncio.sleep(0.1)
+    
+    @pytest.mark.asyncio
+    async def test_sse_error_handling(self, mock_queue_manager):
+        """Test SSE error handling and recovery."""
+        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
+        server = WebServer(mock_queue_manager, config)
+        
+        # Mock a queue manager method to raise an exception
+        original_get_queue_status = mock_queue_manager._get_queue_status
+        
+        def failing_get_queue_status():
+            raise Exception("Mock queue error")
+        
+        mock_queue_manager._get_queue_status = failing_get_queue_status
+        
+        async with httpx.AsyncClient(app=server.app, base_url="http://test") as client:
+            async with client.stream("GET", "/events") as response:
+                assert response.status_code == 200
+                
+                # Should receive an error event
+                error_event = await self._read_sse_event(response)
+                assert error_event["type"] == "error"
+                assert "error" in error_event
+                assert "timestamp" in error_event
+        
+        # Restore original method
+        mock_queue_manager._get_queue_status = original_get_queue_status
+    
+    @pytest.mark.asyncio
+    async def test_sse_event_serialization(self, async_client, mock_queue_manager):
+        """Test proper SSE event serialization and formatting."""
+        from src.youtube_notion.web.models import QueueStatus
+        from datetime import datetime
+        
+        # Add an item with various metadata
+        item = mock_queue_manager.add_mock_item(
+            "test-item", 
+            "https://youtu.be/test123", 
+            QueueStatus.TODO
+        )
+        item.title = "Test Video Title"
+        item.thumbnail_url = "https://img.youtube.com/vi/test123/maxresdefault.jpg"
+        item.channel = "Test Channel"
+        item.custom_prompt = "Custom test prompt"
+        
+        async with async_client.stream("GET", "/events") as response:
+            # Read initial status event
+            event = await self._read_sse_event(response)
+            
+            assert event["type"] == "queue_status"
+            assert "timestamp" in event
+            
+            # Verify item serialization
+            todo_items = event["data"]["todo"]
+            assert len(todo_items) == 1
+            
+            item_data = todo_items[0]
+            assert item_data["id"] == "test-item"
+            assert item_data["url"] == "https://youtu.be/test123"
+            assert item_data["status"] == "todo"
+            assert item_data["title"] == "Test Video Title"
+            assert item_data["thumbnail_url"] == "https://img.youtube.com/vi/test123/maxresdefault.jpg"
+            assert item_data["channel"] == "Test Channel"
+            assert item_data["custom_prompt"] == "Custom test prompt"
+            assert "created_at" in item_data
+            assert item_data["started_at"] is None
+            assert item_data["completed_at"] is None
+    
+    @pytest.mark.asyncio
+    async def test_sse_multiple_status_changes(self, async_client, mock_queue_manager):
+        """Test multiple rapid status changes are properly broadcast."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        async with async_client.stream("GET", "/events") as response:
+            # Read initial status
+            await self._read_sse_event(response)
+            
+            # Add multiple items rapidly
+            item_ids = []
+            for i in range(3):
+                item_id = mock_queue_manager._enqueue(f"https://youtu.be/test{i}")
+                item_ids.append(item_id)
+            
+            # Should receive status change events for each item
+            events = []
+            for _ in range(3):
+                event = await asyncio.wait_for(self._read_sse_event(response), timeout=2.0)
+                events.append(event)
+            
+            # Verify all events are status changes
+            for event in events:
+                assert event["type"] == "status_change"
+                assert event["data"]["item_id"] in item_ids
+                assert event["data"]["item"]["status"] == "todo"
+            
+            # Change status of one item
+            mock_queue_manager.set_item_status(item_ids[0], QueueStatus.IN_PROGRESS)
+            
+            # Should receive status change event
+            status_event = await self._read_sse_event(response)
+            assert status_event["type"] == "status_change"
+            assert status_event["data"]["item_id"] == item_ids[0]
+            assert status_event["data"]["item"]["status"] == "in_progress"
+    
+    @pytest.mark.asyncio
+    async def test_sse_connection_resilience(self, mock_queue_manager):
+        """Test SSE connection resilience with queue full scenarios."""
+        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
+        server = WebServer(mock_queue_manager, config)
+        
+        async with httpx.AsyncClient(app=server.app, base_url="http://test") as client:
+            async with client.stream("GET", "/events") as response:
+                # Read initial status
+                await self._read_sse_event(response)
+                
+                # Simulate a scenario where connection queue might get full
+                # by rapidly adding many items
+                for i in range(10):
+                    mock_queue_manager._enqueue(f"https://youtu.be/rapid{i}")
+                
+                # Should still be able to read events
+                events_received = 0
+                try:
+                    while events_received < 5:  # Read at least 5 events
+                        event = await asyncio.wait_for(
+                            self._read_sse_event(response), 
+                            timeout=2.0
+                        )
+                        if event["type"] == "status_change":
+                            events_received += 1
+                except asyncio.TimeoutError:
+                    # This is acceptable - we might not receive all events
+                    # if the connection queue handling drops some
+                    pass
+                
+                # Should have received at least some events
+                assert events_received > 0
+    
+    async def _read_sse_event(self, response) -> dict:
+        """
+        Helper method to read and parse a single SSE event.
+        
+        Args:
+            response: HTTP response stream
+            
+        Returns:
+            dict: Parsed event data
+        """
+        lines = []
+        async for line in response.aiter_lines():
+            if line.startswith("data: "):
+                data_line = line[6:]  # Remove "data: " prefix
+                return json.loads(data_line)
+            elif line == "":
+                # Empty line indicates end of event, but no data found
+                continue
+        
+        raise ValueError("No SSE event data found")
+
+
+class TestSSEIntegration:
+    """Integration tests for SSE with queue manager interactions."""
+    
+    @pytest.fixture
+    def mock_queue_manager(self):
+        """Create a mock queue manager for integration testing."""
+        from tests.fixtures.mock_implementations import MockQueueManager
+        return MockQueueManager()
+    
+    @pytest.fixture
+    def server(self, mock_queue_manager):
+        """Create a web server instance for integration testing."""
+        config = WebServerConfig(debug=True, sse_heartbeat_interval=2)
+        return WebServer(mock_queue_manager, config)
+    
+    def test_sse_listener_registration(self, server, mock_queue_manager):
+        """Test that SSE properly registers as a queue status listener."""
+        # Server should have registered a status listener
+        assert len(mock_queue_manager.add_status_listener_calls) == 1
+        
+        # The listener should be callable
+        listener = mock_queue_manager.add_status_listener_calls[0]
+        assert callable(listener)
+    
+    @pytest.mark.asyncio
+    async def test_sse_queue_integration(self, server, mock_queue_manager):
+        """Test full integration between SSE and queue manager."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        async with httpx.AsyncClient(app=server.app, base_url="http://test") as client:
+            async with client.stream("GET", "/events") as response:
+                # Read initial status
+                initial_event = await self._read_sse_event(response)
+                assert initial_event["type"] == "queue_status"
+                
+                # Add item through queue manager
+                item_id = mock_queue_manager._enqueue("https://youtu.be/integration")
+                
+                # Should receive status change event
+                status_event = await asyncio.wait_for(
+                    self._read_sse_event(response), 
+                    timeout=2.0
+                )
+                assert status_event["type"] == "status_change"
+                assert status_event["data"]["item_id"] == item_id
+                
+                # Change item status
+                mock_queue_manager.set_item_status(item_id, QueueStatus.IN_PROGRESS)
+                
+                # Should receive another status change event
+                progress_event = await asyncio.wait_for(
+                    self._read_sse_event(response), 
+                    timeout=2.0
+                )
+                assert progress_event["type"] == "status_change"
+                assert progress_event["data"]["item"]["status"] == "in_progress"
+    
+    async def _read_sse_event(self, response) -> dict:
+        """Helper method to read and parse a single SSE event."""
+        async for line in response.aiter_lines():
+            if line.startswith("data: "):
+                data_line = line[6:]  # Remove "data: " prefix
+                return json.loads(data_line)
+        
+        raise ValueError("No SSE event data found")
