@@ -62,6 +62,7 @@
 
 
 
+
   - Modify QueueManager to use existing VideoProcessor and ComponentFactory
   - Implement status update callbacks during video processing phases
   - Add support for chunked video processing status updates
