@@ -436,6 +436,20 @@ class WebServer:
                 return FileResponse(str(js_path))
             else:
                 raise HTTPException(status_code=404, detail="app.js not found")
+        
+        # Serve component files directly
+        @self.app.get("/components/{filename}")
+        async def serve_component_file(filename: str):
+            """Serve component JavaScript files."""
+            # Security check - only allow .js files
+            if not filename.endswith('.js'):
+                raise HTTPException(status_code=404, detail="File not found")
+            
+            component_path = static_path / "components" / filename
+            if component_path.exists():
+                return FileResponse(str(component_path))
+            else:
+                raise HTTPException(status_code=404, detail=f"Component file {filename} not found")
     
     def _setup_queue_listener(self) -> None:
         """Setup listener for queue status changes."""

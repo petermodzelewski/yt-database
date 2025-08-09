@@ -663,8 +663,6 @@ class QueueColumns {
         return errorDetails;
     }
 
-    }
-
     /**
      * Update header statistics
      * @param {Object} queueData - Queue data
