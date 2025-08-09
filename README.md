@@ -12,7 +12,9 @@ A Python application that automatically processes YouTube videos and adds AI-gen
 - 📝 **Markdown to Notion**: Converts markdown summaries to Notion's rich text format
 - 🎨 **Rich Formatting**: Supports headers, bullet points, numbered lists, bold, and italic text
 - 🖼️ **Cover Images**: Automatically adds video thumbnails as page covers
-- 🔄 **Dual Mode Operation**: Supports both example data mode and live YouTube processing
+- 🌐 **Web UI Mode**: Visual three-column interface (To Do, In Progress, Done) for queue management
+- 🔄 **Dual Mode Operation**: Supports both CLI and web UI modes with shared processing logic
+- 📊 **Real-time Updates**: Live status updates and progress monitoring through Server-Sent Events
 - 🛡️ **Robust Error Handling**: Comprehensive error handling with retry logic and graceful fallbacks
 - ⚡ **Intelligent Quota Management**: Automatically handles API quota limits with smart retry delays
 - 🔄 **Batch Processing**: Process multiple URLs with resilient error handling
@@ -46,11 +48,19 @@ youtube-notion-integration/
 │       ├── storage/             # Data persistence
 │       │   └── notion_storage.py
 │       ├── processors/          # Orchestration layer
-│       │   └── video_processor.py # Main orchestrator
+│       │   ├── video_processor.py # Main orchestrator
+│       │   └── queue_manager.py   # Queue management for web UI
 │       ├── config/              # Configuration & DI
 │       │   ├── factory.py       # Component factory
 │       │   ├── settings.py      # Environment config
 │       │   └── example_data.py
+│       ├── web/                 # Web UI components
+│       │   ├── server.py        # FastAPI web server
+│       │   ├── models.py        # Pydantic data models
+│       │   └── static/          # Frontend assets
+│       │       ├── index.html   # Main HTML page
+│       │       ├── app.js       # JavaScript application
+│       │       └── styles.css   # YouTube-inspired styling
 │       └── utils/               # Shared utilities
 │           ├── exceptions.py    # Exception hierarchy
 │           ├── chat_logger.py   # Conversation logging
@@ -105,7 +115,10 @@ youtube-notion-integration/
   # Test with example data first
   python youtube_notion_cli.py --example-data
   
-  # Then try a real YouTube video
+  # Try the web UI mode (recommended)
+  python youtube_notion_cli.py --ui
+  
+  # Then try a real YouTube video via CLI
   python youtube_notion_cli.py --url "https://youtu.be/dQw4w9WgXcQ"
   ```
 
@@ -167,7 +180,158 @@ The full summary content will be added as the page content with proper markdown 
 
 ### 4. Run the Application
 
-The application supports two main modes of operation:
+The application supports three main modes of operation:
+
+## Web UI Mode (Recommended)
+
+The web UI mode provides a visual interface for managing video processing with a three-column layout inspired by YouTube's design.
+
+### Starting Web UI Mode
+
+```bash
+# Start the web interface (automatically opens browser)
+python youtube_notion_cli.py --ui
+
+# The web server will start on http://localhost:8080
+# Your browser will automatically open to the interface
+```
+
+### Web UI Features
+
+The web interface provides a **three-column layout** for visual queue management:
+
+- **To Do Column**: Shows queued URLs waiting to be processed
+- **In Progress Column**: Displays currently processing videos with real-time status updates
+- **Done Column**: Contains completed videos with chat log viewing options
+
+### Three-Column Interface Description
+
+The web UI features a clean, YouTube-inspired design with three distinct columns:
+
+> **Note**: Screenshots of the web interface will be added in a future update to visually demonstrate the three-column layout and user interactions.
+
+#### To Do Column (📋)
+- **Purpose**: Shows queued URLs waiting to be processed
+- **Add Button**: Large "+" button in the column header for adding new URLs
+- **URL Input Modal**: Click "+" to open a popup with:
+  - YouTube URL input field with validation
+  - Optional custom prompt textarea for AI instructions
+  - Add to Queue and Cancel buttons
+- **Queue Items**: Display video thumbnails, titles, and metadata when available
+
+#### In Progress Column (⚡)
+- **Purpose**: Shows currently processing videos with real-time updates
+- **Status Indicators**: Current processing phase (metadata extraction, AI summary, Notion upload)
+- **Progress Information**: For long videos, displays "Processing chunk 2/4" indicators
+- **Real-time Updates**: Items automatically move here when processing begins
+
+#### Done Column (✅)
+- **Purpose**: Contains completed videos with access to processing results
+- **Chat Log Access**: Eye button (👁) next to each completed item
+- **Chunked Video Support**: Multiple numbered eye buttons (👁1, 👁2, 👁3) for videos processed in chunks
+- **Success Indicators**: Visual confirmation of successful Notion integration
+
+#### Header Statistics
+- **Total Count**: Shows total number of items across all columns
+- **Processing Count**: Shows number of items currently being processed
+- **Real-time Updates**: Counters update automatically as items move between columns
+
+#### Adding URLs to the Queue
+
+1. **Click the "+" button** next to the "To Do" column header
+2. **Enter a YouTube URL** in the popup input field (supports all YouTube URL formats)
+3. **Optionally add a custom prompt** for specialized AI summary instructions
+4. **Click "Add to Queue"** or press Enter
+5. The URL will appear in the "To Do" column with video thumbnail and metadata
+
+#### Monitoring Progress
+
+- **Real-time Updates**: Videos automatically move between columns as processing progresses
+- **Status Indicators**: See current processing phase (metadata extraction, AI summary, Notion upload)
+- **Chunk Processing**: For long videos, see "Processing chunk 2/4" indicators
+- **Progress Bars**: Visual progress indicators for each processing phase
+- **Error Handling**: Failed items show error status with retry options
+
+#### Viewing Chat Logs
+
+1. **Completed Videos**: Look for the eye (👁) button next to completed items
+2. **Click the Eye Button**: Opens a modal popup with the full chat log
+3. **Chunked Videos**: Multiple numbered eye buttons (👁1, 👁2, 👁3) for each chunk
+4. **Formatted Display**: Chat logs are displayed with proper formatting and syntax highlighting
+
+### Web UI Setup Requirements
+
+The web UI mode requires the same API keys as CLI mode:
+
+```bash
+# Required for web UI mode
+NOTION_TOKEN=your_notion_integration_token_here
+GEMINI_API_KEY=your_google_gemini_api_key_here
+
+# Optional but recommended
+YOUTUBE_API_KEY=your_youtube_data_api_key_here
+
+# Web server configuration (optional)
+WEB_HOST=127.0.0.1
+WEB_PORT=8080
+```
+
+### Web UI Architecture
+
+The web interface consists of:
+
+- **FastAPI Backend**: Serves the web interface and provides REST API endpoints
+- **Server-Sent Events**: Real-time updates without page refreshes
+- **Shared Queue System**: Same processing logic as CLI batch mode
+- **Static Frontend**: Modern JavaScript single-page application
+- **YouTube-Inspired Design**: Familiar visual styling and user experience
+
+### Web Dependencies
+
+The web UI mode requires additional dependencies that are automatically installed:
+
+```bash
+# These are included in requirements.txt
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+```
+
+#### Optional: JavaScript Testing Dependencies
+
+For frontend development and testing (optional):
+
+```bash
+# Navigate to web static directory
+cd web/static
+
+# Install JavaScript testing dependencies
+npm install
+
+# Run frontend tests (optional)
+npm test
+```
+
+**Note**: JavaScript dependencies are only needed for frontend development and testing. The web UI works without installing npm packages.
+
+### Web UI vs CLI Mode
+
+| Feature | Web UI Mode | CLI Mode |
+|---------|-------------|----------|
+| **Interface** | Visual three-column layout | Command-line text output |
+| **Queue Management** | Interactive add/remove | Batch processing only |
+| **Progress Monitoring** | Real-time visual updates | Text progress indicators |
+| **Chat Log Viewing** | Modal popups with formatting | File-based log access |
+| **Multi-tasking** | Add URLs while processing | Sequential processing only |
+| **Error Handling** | Visual error states with retry | Text error messages |
+| **Accessibility** | Point-and-click interface | Keyboard/script friendly |
+| **Best For** | Interactive use, visual feedback | Automation, scripting, batch jobs |
+| **Browser Required** | Yes | No |
+| **Real-time Updates** | Automatic via Server-Sent Events | Manual refresh/re-run |
+
+### 4. Run the Application (CLI Mode)
+
+The CLI mode supports both single video and batch processing:
 
 #### YouTube URL Processing Mode (Recommended)
 
@@ -209,6 +373,7 @@ python youtube_notion_cli.py --example-data
 
 | Option | Description | Example |
 |--------|-------------|---------|
+| `--ui` | Start web interface mode | `--ui` |
 | `--url URL` | Process a single YouTube video URL | `--url "https://youtu.be/abc123"` |
 | `--urls URLS` | Process multiple URLs (comma-separated) | `--urls "url1,url2,url3"` |
 | `--file FILE` | Process URLs from file (one per line) | `--file urls.txt` |
@@ -221,25 +386,34 @@ python youtube_notion_cli.py --example-data
 ```bash
 # Method 1: Direct script execution (recommended for development)
 python youtube_notion_cli.py --url "https://www.youtube.com/watch?v=VIDEO_ID"
+python youtube_notion_cli.py --ui  # Web UI mode
 
 # Method 2: Install as package and use entry point
 pip install -e .
 youtube-notion --url "https://www.youtube.com/watch?v=VIDEO_ID"
+youtube-notion --ui  # Web UI mode
 
 # Method 3: Run as module
 python -m youtube_notion.main
 
 # Method 4: Import and use programmatically
 python -c "from youtube_notion.main import main; main(youtube_url='https://youtu.be/VIDEO_ID')"
+python -c "from youtube_notion.main import main_ui; main_ui()"  # Web UI mode
 ```
 
 #### Execution Mode Details
 
-**YouTube URL Processing Mode:**
-- **Purpose**: Process real YouTube videos with AI-generated summaries
+**Web UI Mode:**
+- **Purpose**: Visual interface for queue-based video processing
 - **Requirements**: GEMINI_API_KEY (required), YOUTUBE_API_KEY (optional)
-- **Features**: Dynamic metadata extraction, AI-powered summaries, smart timestamp linking
-- **Use Case**: Production use for processing actual YouTube content
+- **Features**: Three-column layout, real-time updates, interactive queue management, chat log viewing
+- **Use Case**: Interactive processing with visual feedback and queue management
+
+**YouTube URL Processing Mode (CLI):**
+- **Purpose**: Process real YouTube videos with AI-generated summaries via command line
+- **Requirements**: GEMINI_API_KEY (required), YOUTUBE_API_KEY (optional)
+- **Features**: Dynamic metadata extraction, AI-powered summaries, smart timestamp linking, batch processing
+- **Use Case**: Automated processing, scripting, batch operations
 
 **Example Data Mode:**
 - **Purpose**: Demonstration and testing without API dependencies
@@ -401,6 +575,11 @@ YOUTUBE_API_KEY=your_youtube_data_api_key_here
 DATABASE_NAME=YT Summaries
 PARENT_PAGE_NAME=YouTube Knowledge Base
 
+# Web Server Configuration (for --ui mode)
+WEB_HOST=127.0.0.1
+WEB_PORT=8080
+WEB_DEBUG=false
+
 # AI Model Configuration
 GEMINI_MODEL=gemini-2.0-flash-exp
 GEMINI_TEMPERATURE=0.1
@@ -424,6 +603,9 @@ VERBOSE=false
 | `YOUTUBE_API_KEY` | ⚠️ Optional | - | YouTube Data API key |
 | `DATABASE_NAME` | ⚠️ Optional | "YT Summaries" | Target Notion database name |
 | `PARENT_PAGE_NAME` | ⚠️ Optional | "YouTube Knowledge Base" | Parent page name |
+| `WEB_HOST` | ⚠️ Optional | "127.0.0.1" | Web server host (UI mode) |
+| `WEB_PORT` | ⚠️ Optional | 8080 | Web server port (UI mode) |
+| `WEB_DEBUG` | ⚠️ Optional | false | Enable web server debug mode |
 | `GEMINI_MODEL` | ⚠️ Optional | "gemini-2.0-flash-exp" | Gemini model to use |
 | `GEMINI_TEMPERATURE` | ⚠️ Optional | 0.1 | AI creativity (0.0-1.0) |
 | `GEMINI_MAX_OUTPUT_TOKENS` | ⚠️ Optional | 4000 | Maximum response length |
@@ -737,10 +919,13 @@ The quota handling works automatically with these defaults:
 # Step 1: Test with example data (no API keys needed except Notion)
 python youtube_notion_cli.py --example-data
 
-# Step 2: Test YouTube processing with a short video
+# Step 2: Test web UI mode (recommended for interactive use)
+python youtube_notion_cli.py --ui
+
+# Step 3: Test CLI YouTube processing with a short video
 python youtube_notion_cli.py --url "https://youtu.be/dQw4w9WgXcQ"
 
-# Step 3: Process a real educational video
+# Step 4: Process a real educational video
 python youtube_notion_cli.py --url "https://www.youtube.com/watch?v=ACTUAL_VIDEO_ID"
 ```
 
@@ -793,9 +978,58 @@ python youtube_notion_cli.py --url "https://youtu.be/video3"
 - Continues processing even if individual URLs fail
 - Optimized output for batch operations (less verbose)
 
-#### 4. Development and Testing
+#### 4. Web UI Workflows
+
+**Interactive Queue Management:**
 ```bash
-# Test with debug output
+# Start web UI for visual queue management
+python youtube_notion_cli.py --ui
+
+# Then use the web interface to:
+# 1. Click "+" to add YouTube URLs to queue
+# 2. Monitor real-time processing progress
+# 3. View completed videos and chat logs
+# 4. Handle errors with visual feedback
+```
+
+**Web UI with Custom Configuration:**
+```bash
+# Start web UI on custom port
+WEB_PORT=3000 python youtube_notion_cli.py --ui
+
+# Start with debug mode for troubleshooting
+WEB_DEBUG=true python youtube_notion_cli.py --ui
+
+# Access from other devices (use with caution)
+WEB_HOST=0.0.0.0 python youtube_notion_cli.py --ui
+
+# Combine with other environment variables
+GEMINI_MODEL=gemini-1.5-pro WEB_PORT=3000 python youtube_notion_cli.py --ui
+```
+
+**Web UI Workflow Examples:**
+
+1. **Educational Content Processing:**
+   - Start web UI: `python youtube_notion_cli.py --ui`
+   - Add multiple course videos to queue using the "+" button
+   - Monitor processing progress in real-time
+   - View completed summaries and chat logs
+
+2. **Meeting/Conference Processing:**
+   - Queue multiple session recordings
+   - Use custom prompts for meeting-specific summaries
+   - Track progress across multiple long videos
+   - Access individual chunk logs for detailed analysis
+
+3. **Research Video Analysis:**
+   - Add research videos with custom analysis prompts
+   - Monitor chunk processing for long academic content
+   - Review detailed chat logs for each processing phase
+   - Export results to Notion for further organization
+
+#### 5. Development and Testing
+```bash
+# Test with debug output (CLI mode)
 DEBUG=true python youtube_notion_cli.py --url "https://youtu.be/test-video"
 
 # Test different models
@@ -803,6 +1037,9 @@ GEMINI_MODEL=gemini-1.5-pro python youtube_notion_cli.py --url "https://youtu.be
 
 # Test without YouTube API (web scraping fallback)
 YOUTUBE_API_KEY= python youtube_notion_cli.py --url "https://youtu.be/test-video"
+
+# Test web UI with debug mode
+WEB_DEBUG=true python youtube_notion_cli.py --ui
 ```
 
 ### URL Format Support
@@ -1009,12 +1246,16 @@ This project follows a **component-based architecture** with clear separation of
 
 | Component | Purpose | Key Functions |
 |-----------|---------|---------------|
-| `main.py` | Application entry point | Orchestrates ComponentFactory and VideoProcessor |
+| `main.py` | Application entry point | Orchestrates ComponentFactory, VideoProcessor, and web UI modes |
 | `interfaces/` | Abstract contracts | `Storage`, `SummaryWriter` interfaces |
 | `extractors/` | YouTube metadata | URL validation, video ID extraction, metadata retrieval |
 | `writers/` | AI summary generation | Gemini AI integration with streaming and retry logic |
 | `storage/` | Data persistence | Notion database operations with rich text conversion |
-| `processors/` | Workflow orchestration | Coordinates all components through dependency injection |
+| `processors/video_processor.py` | Workflow orchestration | Coordinates all components through dependency injection |
+| `processors/queue_manager.py` | Queue management | Thread-safe queue operations, status tracking, real-time updates |
+| `web/server.py` | Web server | FastAPI application, REST API endpoints, Server-Sent Events |
+| `web/models.py` | Data models | Pydantic models for API requests/responses and queue items |
+| `web/static/` | Frontend assets | HTML, CSS, JavaScript for three-column interface |
 | `config/factory.py` | Dependency injection | Creates and configures components based on environment |
 | `utils/exceptions.py` | Error handling | Structured exception hierarchy |
 | `utils/chat_logger.py` | Conversation logging | Automatic cleanup and structured logging |
@@ -1103,11 +1344,15 @@ Becomes:
 
 ### Package Structure
 
-- `src/youtube_notion/main.py` - Application entry point
+- `src/youtube_notion/main.py` - Application entry point (CLI and web UI modes)
 - `src/youtube_notion/storage/notion_storage.py` - Notion database operations
 - `src/youtube_notion/writers/gemini_summary_writer.py` - AI summary generation
 - `src/youtube_notion/extractors/video_metadata_extractor.py` - YouTube metadata extraction
 - `src/youtube_notion/processors/video_processor.py` - Main orchestration logic
+- `src/youtube_notion/processors/queue_manager.py` - Queue management for web UI
+- `src/youtube_notion/web/server.py` - FastAPI web server for UI mode
+- `src/youtube_notion/web/models.py` - Pydantic data models for API
+- `src/youtube_notion/web/static/` - Frontend assets (HTML, CSS, JavaScript)
 - `src/youtube_notion/utils/markdown_converter.py` - Markdown to Notion conversion
 - `src/youtube_notion/config/example_data.py` - Sample data for testing
 - `src/youtube_notion/config/factory.py` - Component dependency injection
@@ -1143,6 +1388,9 @@ The project uses these core dependencies:
 | `google-api-python-client` | >=2.0.0 | YouTube Data API access |
 | `python-dotenv` | Latest | Environment variable management |
 | `requests` | >=2.25.0 | HTTP requests and web scraping |
+| `fastapi` | >=0.104.0 | Web server framework (UI mode) |
+| `uvicorn` | >=0.24.0 | ASGI server (UI mode) |
+| `pydantic` | >=2.0.0 | Data validation (UI mode) |
 | `pytest` | Latest | Testing framework |
 | `hypothesis` | Latest | Property-based testing |
 
@@ -1163,6 +1411,48 @@ The markdown converter supports:
 ## Troubleshooting
 
 ### Common Issues by Mode
+
+#### Web UI Mode Issues
+
+**"Web server failed to start"**
+```bash
+# Check if port is already in use
+netstat -an | grep :8080  # Windows
+lsof -i :8080            # macOS/Linux
+
+# Use different port
+WEB_PORT=3000 python youtube_notion_cli.py --ui
+
+# Check for missing web dependencies
+pip install fastapi uvicorn pydantic
+```
+
+**"Browser doesn't open automatically"**
+```bash
+# Manually open browser to:
+http://localhost:8080
+
+# Or use custom host/port:
+http://localhost:3000  # If using WEB_PORT=3000
+```
+
+**"Real-time updates not working"**
+- Check browser console for JavaScript errors
+- Verify Server-Sent Events are supported (modern browsers)
+- Try refreshing the page to reconnect
+- Check firewall/antivirus blocking connections
+
+**"Cannot add URLs to queue"**
+- Verify YouTube URL format is correct
+- Check browser network tab for API errors
+- Ensure GEMINI_API_KEY is configured
+- Try refreshing the page
+
+**"Chat logs not displaying"**
+- Ensure video processing completed successfully
+- Check that chat log files exist in `chat_logs/` directory
+- Verify file permissions allow reading
+- Try refreshing the page
 
 #### YouTube URL Processing Mode Issues
 
@@ -1236,6 +1526,12 @@ python -c "import os; print('NOTION_TOKEN' in os.environ)"
 
 **Invalid Argument Combinations**
 ```bash
+# ❌ Cannot use --ui with other processing modes
+python youtube_notion_cli.py --ui --url "https://youtu.be/abc"
+python youtube_notion_cli.py --ui --example-data
+python youtube_notion_cli.py --ui --urls "url1,url2"
+python youtube_notion_cli.py --ui --file urls.txt
+
 # ❌ Cannot use --prompt without single --url
 python youtube_notion_cli.py --prompt "Custom prompt" --example-data
 python youtube_notion_cli.py --prompt "Custom prompt" --urls "url1,url2"
@@ -1247,6 +1543,7 @@ python youtube_notion_cli.py --urls "url1,url2" --file urls.txt
 python youtube_notion_cli.py --url "https://youtu.be/abc" --urls "url1,url2"
 
 # ✅ Valid combinations
+python youtube_notion_cli.py --ui  # Web UI mode
 python youtube_notion_cli.py --url "https://youtu.be/abc" --prompt "Custom prompt"
 python youtube_notion_cli.py --urls "url1,url2,url3"
 python youtube_notion_cli.py --file urls.txt
@@ -1294,8 +1591,11 @@ DEBUG=true python youtube_notion_cli.py --url "https://youtu.be/abc"
 # Show all available options
 python youtube_notion_cli.py --help
 
-# Test with example data first
+# Test with example data first (CLI mode)
 python youtube_notion_cli.py --example-data
+
+# Test web UI mode
+python youtube_notion_cli.py --ui
 
 # Verify API keys work
 python -c "
@@ -1305,6 +1605,15 @@ load_dotenv()
 print('NOTION_TOKEN:', 'SET' if os.getenv('NOTION_TOKEN') else 'MISSING')
 print('GEMINI_API_KEY:', 'SET' if os.getenv('GEMINI_API_KEY') else 'MISSING')
 print('YOUTUBE_API_KEY:', 'SET' if os.getenv('YOUTUBE_API_KEY') else 'MISSING')
+"
+
+# Test web server dependencies
+python -c "
+try:
+    import fastapi, uvicorn, pydantic
+    print('Web dependencies: INSTALLED')
+except ImportError as e:
+    print('Web dependencies: MISSING -', e)
 "
 ```
 
