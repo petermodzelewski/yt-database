@@ -402,132 +402,67 @@ class TestServerSentEvents:
             assert queue_data["completed"][0]["id"] == "item-3"
 
     
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_status_change_events(self, server, mock_queue_manager):
-        """Test that SSE broadcasts status change events."""
+    def test_sse_status_change_events(self, server, mock_queue_manager):
+        """Test that SSE broadcasts status change events via listener."""
         from src.youtube_notion.web.models import QueueStatus
-        from httpx import AsyncClient, ASGITransport
         
-        # Start SSE connection
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            async with client.stream("GET", "/events") as response:
-                assert response.status_code == 200
-                
-                # Read initial status event
-                initial_event = await self._read_sse_event(response)
-                assert initial_event["type"] == "queue_status"
-                
-                # Simulate status change by adding an item
-                item_id = mock_queue_manager._enqueue("https://youtu.be/newvideo")
-                
-                # Should receive a status change event
-                status_event = await self._read_sse_event(response)
-                assert status_event["type"] == "status_change"
-                assert status_event["data"]["item_id"] == item_id
-                assert status_event["data"]["item"]["url"] == "https://youtu.be/newvideo"
-                assert status_event["data"]["item"]["status"] == "todo"
-    
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_heartbeat_functionality(self, server, mock_queue_manager):
-        """Test SSE heartbeat functionality."""
-        from httpx import AsyncClient, ASGITransport
+        # Get the registered listener
+        assert len(mock_queue_manager.add_status_listener_calls) == 1
+        listener = mock_queue_manager.add_status_listener_calls[0]
         
-        # Start SSE connection
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            async with client.stream("GET", "/events") as response:
-                assert response.status_code == 200
-                
-                # Read initial status event
-                initial_event = await self._read_sse_event(response)
-                assert initial_event["type"] == "queue_status"
-                
-                # Wait for heartbeat (should come within heartbeat interval + some buffer)
-                heartbeat_event = await asyncio.wait_for(
-                    self._read_sse_event(response), 
-                    timeout=3.0  # Heartbeat interval is 1 second + buffer
-                )
-                assert heartbeat_event["type"] == "heartbeat"
-                assert "timestamp" in heartbeat_event
+        # Create a mock item
+        item = mock_queue_manager.add_mock_item(
+            "test-item", 
+            "https://youtu.be/test", 
+            QueueStatus.TODO
+        )
+        
+        # Track SSE connections before calling listener
+        initial_connections = len(server._sse_connections)
+        
+        # Call the listener directly (simulating a status change)
+        listener("test-item", item)
+        
+        # Verify the listener was called without errors
+        # (The broadcast method should handle empty connections gracefully)
+        assert len(server._sse_connections) == initial_connections
     
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_connection_management(self, mock_queue_manager):
-        """Test SSE connection management and cleanup."""
-        from httpx import AsyncClient, ASGITransport
+
+    
+
+    
+    def test_sse_error_handling(self, mock_queue_manager):
+        """Test SSE error handling in broadcast method."""
+        from src.youtube_notion.web.models import QueueStatus
+        import asyncio
         
         config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
         server = WebServer(mock_queue_manager, config)
         
-        # Initially no connections
+        # Create a mock connection queue that will raise an exception
+        failing_queue = asyncio.Queue()
+        
+        # Mock put_nowait to raise an exception
+        def failing_put_nowait(data):
+            raise Exception("Mock connection error")
+        
+        failing_queue.put_nowait = failing_put_nowait
+        
+        # Add the failing queue to connections
+        server._sse_connections.append(failing_queue)
+        
+        # Create test event data
+        event_data = {
+            "type": "test_event",
+            "data": {"test": "data"},
+            "timestamp": "2023-01-01T00:00:00"
+        }
+        
+        # This should not raise an exception - errors should be handled gracefully
+        server._broadcast_sse_event(event_data)
+        
+        # The failing connection should be removed from the list
         assert len(server._sse_connections) == 0
-        
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            # Start multiple SSE connections
-            async with client.stream("GET", "/events") as response1:
-                # Should have one connection
-                assert len(server._sse_connections) == 1
-                
-                async with client.stream("GET", "/events") as response2:
-                    # Should have two connections
-                    assert len(server._sse_connections) == 2
-                    
-                    # Read initial events from both connections
-                    event1 = await self._read_sse_event(response1)
-                    event2 = await self._read_sse_event(response2)
-                    
-                    assert event1["type"] == "queue_status"
-                    assert event2["type"] == "queue_status"
-                
-                # After second connection closes, should have one connection
-                # Note: Connection cleanup happens during event broadcasting
-                # so we need to trigger an event to clean up closed connections
-                mock_queue_manager._enqueue("https://youtu.be/trigger")
-                
-                # Read the status change event
-                await self._read_sse_event(response1)
-        
-        # After all connections close, should eventually have no connections
-        # Trigger another event to clean up
-        mock_queue_manager._enqueue("https://youtu.be/cleanup")
-        
-        # Give some time for cleanup
-        await asyncio.sleep(0.1)
-    
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_error_handling(self, mock_queue_manager):
-        """Test SSE error handling and recovery."""
-        from httpx import AsyncClient, ASGITransport
-        
-        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
-        server = WebServer(mock_queue_manager, config)
-        
-        # Mock a queue manager method to raise an exception
-        original_get_queue_status = mock_queue_manager._get_queue_status
-        
-        def failing_get_queue_status():
-            raise Exception("Mock queue error")
-        
-        mock_queue_manager._get_queue_status = failing_get_queue_status
-        
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            async with client.stream("GET", "/events") as response:
-                assert response.status_code == 200
-                
-                # Should receive an error event
-                error_event = await self._read_sse_event(response)
-                assert error_event["type"] == "error"
-                assert "error" in error_event
-                assert "timestamp" in error_event
-        
-        # Restore original method
-        mock_queue_manager._get_queue_status = original_get_queue_status
     
     @pytest.mark.asyncio
     async def test_sse_event_serialization(self, server, mock_queue_manager):
@@ -583,106 +518,43 @@ class TestServerSentEvents:
         assert item_data["started_at"] is None
         assert item_data["completed_at"] is None
     
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_multiple_status_changes(self, server, mock_queue_manager):
+    def test_sse_multiple_status_changes(self, server, mock_queue_manager):
         """Test multiple rapid status changes are properly broadcast."""
         from src.youtube_notion.web.models import QueueStatus
-        from httpx import AsyncClient, ASGITransport
+        import asyncio
         
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            async with client.stream("GET", "/events") as response:
-                # Read initial status
-                await self._read_sse_event(response)
-                
-                # Add multiple items rapidly
-                item_ids = []
-                for i in range(3):
-                    item_id = mock_queue_manager._enqueue(f"https://youtu.be/test{i}")
-                    item_ids.append(item_id)
-                
-                # Should receive status change events for each item
-                events = []
-                for _ in range(3):
-                    event = await asyncio.wait_for(self._read_sse_event(response), timeout=2.0)
-                    events.append(event)
-                
-                # Verify all events are status changes
-                for event in events:
-                    assert event["type"] == "status_change"
-                    assert event["data"]["item_id"] in item_ids
-                    assert event["data"]["item"]["status"] == "todo"
-                
-                # Change status of one item
-                mock_queue_manager.set_item_status(item_ids[0], QueueStatus.IN_PROGRESS)
-                
-                # Should receive status change event
-                status_event = await self._read_sse_event(response)
-                assert status_event["type"] == "status_change"
-                assert status_event["data"]["item_id"] == item_ids[0]
-                assert status_event["data"]["item"]["status"] == "in_progress"
+        # Get the registered listener
+        assert len(mock_queue_manager.add_status_listener_calls) == 1
+        listener = mock_queue_manager.add_status_listener_calls[0]
+        
+        # Create multiple mock items
+        items = []
+        for i in range(3):
+            item = mock_queue_manager.add_mock_item(
+                f"test-item-{i}", 
+                f"https://youtu.be/test{i}", 
+                QueueStatus.TODO
+            )
+            items.append(item)
+        
+        # Create a mock connection queue to track events
+        event_queue = asyncio.Queue()
+        server._sse_connections.append(event_queue)
+        
+        # Call the listener for each item (simulating multiple status changes)
+        for i, item in enumerate(items):
+            listener(f"test-item-{i}", item)
+        
+        # Verify that events were queued (one for each status change)
+        assert event_queue.qsize() == 3
+        
+        # Verify the events are properly formatted
+        for i in range(3):
+            event = event_queue.get_nowait()
+            assert event["type"] == "status_change"
+            assert event["data"]["item_id"] == f"test-item-{i}"
+            assert event["data"]["item"]["url"] == f"https://youtu.be/test{i}"
     
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_connection_resilience(self, mock_queue_manager):
-        """Test SSE connection resilience with queue full scenarios."""
-        from httpx import AsyncClient, ASGITransport
-        
-        config = WebServerConfig(debug=True, sse_heartbeat_interval=1)
-        server = WebServer(mock_queue_manager, config)
-        
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            async with client.stream("GET", "/events") as response:
-                # Read initial status
-                await self._read_sse_event(response)
-                
-                # Simulate a scenario where connection queue might get full
-                # by rapidly adding many items
-                for i in range(10):
-                    mock_queue_manager._enqueue(f"https://youtu.be/rapid{i}")
-                
-                # Should still be able to read events
-                events_received = 0
-                try:
-                    while events_received < 5:  # Read at least 5 events
-                        event = await asyncio.wait_for(
-                            self._read_sse_event(response), 
-                            timeout=2.0
-                        )
-                        if event["type"] == "status_change":
-                            events_received += 1
-                except asyncio.TimeoutError:
-                    # This is acceptable - we might not receive all events
-                    # if the connection queue handling drops some
-                    pass
-                
-                # Should have received at least some events
-                assert events_received > 0
-    
-    async def _read_sse_event(self, response) -> dict:
-        """
-        Helper method to read and parse a single SSE event.
-        
-        Args:
-            response: HTTP response stream
-            
-        Returns:
-            dict: Parsed event data
-        """
-        lines = []
-        async for line in response.aiter_lines():
-            if line.startswith("data: "):
-                data_line = line[6:]  # Remove "data: " prefix
-                return json.loads(data_line)
-            elif line == "":
-                # Empty line indicates end of event, but no data found
-                continue
-        
-        raise ValueError("No SSE event data found")
-
-
 class TestSSEIntegration:
     """Integration tests for SSE with queue manager interactions."""
     
@@ -707,51 +579,62 @@ class TestSSEIntegration:
         listener = mock_queue_manager.add_status_listener_calls[0]
         assert callable(listener)
     
-    @pytest.mark.skip(reason="Async SSE streaming tests need refactoring to avoid hanging")
-    @pytest.mark.asyncio
-    async def test_sse_queue_integration(self, server, mock_queue_manager):
-        """Test full integration between SSE and queue manager."""
-        from src.youtube_notion.web.models import QueueStatus
-        from httpx import AsyncClient, ASGITransport
+    def test_sse_broadcast_functionality(self, server, mock_queue_manager):
+        """Test SSE broadcast method without streaming."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
         
-        transport = ASGITransport(app=server.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            async with client.stream("GET", "/events") as response:
-                # Read initial status
-                initial_event = await self._read_sse_event(response)
-                assert initial_event["type"] == "queue_status"
-                
-                # Add item through queue manager
-                item_id = mock_queue_manager._enqueue("https://youtu.be/integration")
-                
-                # Should receive status change event
-                status_event = await asyncio.wait_for(
-                    self._read_sse_event(response), 
-                    timeout=2.0
-                )
-                assert status_event["type"] == "status_change"
-                assert status_event["data"]["item_id"] == item_id
-                
-                # Change item status
-                mock_queue_manager.set_item_status(item_id, QueueStatus.IN_PROGRESS)
-                
-                # Should receive another status change event
-                progress_event = await asyncio.wait_for(
-                    self._read_sse_event(response), 
-                    timeout=2.0
-                )
-                assert progress_event["type"] == "status_change"
-                assert progress_event["data"]["item"]["status"] == "in_progress"
-    
-    async def _read_sse_event(self, response) -> dict:
-        """Helper method to read and parse a single SSE event."""
-        async for line in response.aiter_lines():
-            if line.startswith("data: "):
-                data_line = line[6:]  # Remove "data: " prefix
-                return json.loads(data_line)
+        # Create a test queue item
+        test_item = QueueItem(
+            id="test-123",
+            url="https://youtu.be/test",
+            status=QueueStatus.TODO,
+            created_at=datetime.now()
+        )
         
-        raise ValueError("No SSE event data found")
+        # Test the broadcast method directly
+        event_data = {
+            "type": "status_change",
+            "data": {
+                "item_id": "test-123",
+                "item": server._queue_item_to_dict(test_item)
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # This should not raise an exception
+        server._broadcast_sse_event(event_data)
+        
+        # Verify the event data structure
+        assert event_data["type"] == "status_change"
+        assert event_data["data"]["item_id"] == "test-123"
+        assert event_data["data"]["item"]["url"] == "https://youtu.be/test"
     
-    async def _read_sse_event_with_timeout(self, response, timeout: float = 2.0) -> dict:
-        """Helper method to read SSE event with timeout."""
-        return await asyncio.wait_for(self._read_sse_event(response), timeout=timeout)
+    def test_queue_item_to_dict_conversion(self, server):
+        """Test conversion of QueueItem to dictionary."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        
+        # Create a test queue item
+        test_item = QueueItem(
+            id="test-456",
+            url="https://youtu.be/test456",
+            status=QueueStatus.IN_PROGRESS,
+            created_at=datetime.now(),
+            title="Test Video",
+            channel="Test Channel"
+        )
+        
+        # Convert to dict
+        item_dict = server._queue_item_to_dict(test_item)
+        
+        # Verify all expected fields are present
+        assert item_dict["id"] == "test-456"
+        assert item_dict["url"] == "https://youtu.be/test456"
+        assert item_dict["status"] == "in_progress"
+        assert item_dict["title"] == "Test Video"
+        assert item_dict["channel"] == "Test Channel"
+        assert "created_at" in item_dict
+        assert "started_at" in item_dict
+        assert "completed_at" in item_dict
+    
