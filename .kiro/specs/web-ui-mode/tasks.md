@@ -165,7 +165,12 @@
   - Write unit tests for CLI argument parsing and mode selection
   - _Requirements: 1.1, 1.2, 1.4, 9.3_
 
-- [ ] 13. Integrate QueueManager with CLI batch processing
+- [x] 13. Integrate QueueManager with CLI batch processing
+
+
+
+
+
   - Modify existing batch processing to use QueueManager internally
   - Ensure CLI batch mode and UI mode share the same queue system
   - Update batch processing output to work with queue status updates

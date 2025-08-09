@@ -5,7 +5,7 @@ Supports both example data mode and dynamic YouTube video processing with AI-gen
 """
 
 import sys
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 # Removed unused import: from notion_client import Client
 
 # Legacy imports removed - using new architecture components
@@ -244,6 +244,131 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None,
             print("=" * 60)
         else:
             print(f"✗ Operation failed")
+        return False
+
+
+def main_batch(urls: List[str]) -> bool:
+    """
+    Main function for batch processing multiple YouTube URLs using QueueManager.
+    
+    This function uses the QueueManager to process multiple URLs sequentially
+    while maintaining the same output format as the original batch processing.
+    Both CLI batch mode and UI mode share the same queue system.
+    
+    Args:
+        urls: List of YouTube URLs to process
+        
+    Returns:
+        bool: True if all URLs processed successfully, False otherwise
+    """
+    print(f"Processing {len(urls)} YouTube URLs...")
+    print("=" * 60)
+    
+    try:
+        # Step 1: Load configuration for YouTube mode
+        config = load_application_config(youtube_mode=True)
+        if not config:
+            print("Error: Configuration validation failed")
+            return False
+        
+        # Step 2: Initialize components
+        factory = ComponentFactory(config)
+        metadata_extractor, summary_writer, storage = factory.create_all_components()
+        
+        # Create video processor
+        processor = VideoProcessor(metadata_extractor, summary_writer, storage)
+        processor.validate_configuration()
+        
+        # Step 3: Create and configure queue manager
+        queue_manager = QueueManager(processor)
+        
+        # Track batch processing progress
+        batch_progress = {
+            'total': len(urls),
+            'completed': 0,
+            'failed': 0,
+            'failed_urls': []
+        }
+        
+        # Add status listener for batch progress tracking
+        def batch_status_listener(item_id: str, item):
+            if item.status.value in ['completed', 'failed']:
+                batch_progress['completed'] += 1
+                if item.status.value == 'failed':
+                    batch_progress['failed'] += 1
+                    batch_progress['failed_urls'].append(item.url)
+                
+                # Print progress update
+                current = batch_progress['completed']
+                total = batch_progress['total']
+                print(f"\n[{current}/{total}] {'✓' if item.status.value == 'completed' else '✗'} {item.url}")
+                if item.status.value == 'failed' and item.error_message:
+                    print(f"    Error: {item.error_message}")
+        
+        queue_manager.add_status_listener(batch_status_listener)
+        
+        # Step 4: Start queue processing
+        queue_manager.start_processing()
+        
+        # Step 5: Add all URLs to queue
+        print("Adding URLs to processing queue...")
+        for i, url in enumerate(urls, 1):
+            try:
+                item_id = queue_manager.enqueue(url)
+                print(f"[{i}/{len(urls)}] Queued: {url}")
+            except Exception as e:
+                print(f"[{i}/{len(urls)}] ✗ Failed to queue {url}: {e}")
+                batch_progress['failed'] += 1
+                batch_progress['failed_urls'].append(url)
+        
+        print("\nProcessing queued URLs...")
+        print("-" * 40)
+        
+        # Step 6: Wait for all processing to complete
+        import time
+        while batch_progress['completed'] < len(urls):
+            time.sleep(0.5)
+            
+            # Check if queue manager is still processing
+            stats = queue_manager.get_statistics()
+            if not stats['processing_active']:
+                break
+        
+        # Step 7: Stop queue processing
+        queue_manager.stop_processing(timeout=5.0)
+        
+        # Step 8: Print summary
+        print("\n" + "=" * 60)
+        print("BATCH PROCESSING SUMMARY")
+        print("=" * 60)
+        print(f"Total URLs processed: {batch_progress['total']}")
+        print(f"Successful: {batch_progress['total'] - batch_progress['failed']}")
+        print(f"Failed: {batch_progress['failed']}")
+        
+        if batch_progress['failed_urls']:
+            print("\nFailed URLs:")
+            for url in batch_progress['failed_urls']:
+                print(f"  - {url}")
+            return False
+        else:
+            print("\n✓ All URLs processed successfully!")
+            return True
+            
+    except ConfigurationError as e:
+        print(f"Error: Configuration error - {e.message}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        return False
+        
+    except ImportError as e:
+        print(f"Error: Failed to import required components - {e}")
+        print("Please ensure all required dependencies are installed:")
+        print("  pip install google-genai google-api-python-client requests")
+        return False
+        
+    except Exception as e:
+        print(f"Error: Unexpected error during batch processing - {e}")
+        print("Please check your configuration and try again.")
         return False
 
 
