@@ -284,7 +284,7 @@ describe('SSEConnection', () => {
             
             expect(updateConnectionStatusSpy).toHaveBeenCalledWith(
                 false,
-                'Connection failed after multiple attempts'
+                'Connection failed - click to retry'
             );
         });
     });

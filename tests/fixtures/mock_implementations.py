@@ -845,6 +845,152 @@ class MockVideoProcessor:
         # Track the call
         self.validate_configuration_calls.append(())
         
+        return self.configuration_valid
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.process_video_calls.clear()
+        self.validate_configuration_calls.clear()
+        self.metadata_extractor.reset_calls()
+        self.summary_writer.reset_calls()
+        self.storage.reset_calls()
+
+
+class MockWebServer:
+    """
+    Mock implementation of WebServer for testing.
+    
+    This mock provides a complete web server interface with configurable
+    behavior for testing web UI components and integration scenarios.
+    """
+    
+    def __init__(self, queue_manager=None, config=None, should_fail_start: bool = False):
+        """
+        Initialize the mock web server.
+        
+        Args:
+            queue_manager: Mock queue manager instance
+            config: Mock web server configuration
+            should_fail_start: If True, start() will raise an exception
+        """
+        self.queue_manager = queue_manager
+        self.config = config or self._create_default_config()
+        self.should_fail_start = should_fail_start
+        
+        # Server state
+        self.is_running = False
+        self.port = self.config.port if hasattr(self.config, 'port') else 8080
+        
+        # Call tracking
+        self.start_calls: List[tuple] = []
+        self.stop_calls: List[tuple] = []
+        
+        # Mock methods for unittest.mock compatibility
+        self.start = Mock(side_effect=self._start)
+        self.stop = Mock(side_effect=self._stop)
+    
+    def _create_default_config(self):
+        """Create a default mock configuration."""
+        from unittest.mock import Mock
+        config = Mock()
+        config.port = 8080
+        config.host = "127.0.0.1"
+        config.debug = False
+        return config
+    
+    def _start(self):
+        """
+        Start the mock web server.
+        
+        Raises:
+            RuntimeError: If server is already running or configured to fail
+        """
+        # Track the call
+        self.start_calls.append(())
+        
+        if self.is_running:
+            raise RuntimeError("Server is already running")
+        
+        if self.should_fail_start:
+            raise RuntimeError("Mock server configured to fail on start")
+        
+        self.is_running = True
+    
+    def _stop(self, timeout: float = 5.0) -> bool:
+        """
+        Stop the mock web server.
+        
+        Args:
+            timeout: Maximum time to wait for shutdown
+            
+        Returns:
+            bool: True if stopped successfully, False otherwise
+        """
+        # Track the call
+        self.stop_calls.append((timeout,))
+        
+        if not self.is_running:
+            return True
+        
+        self.is_running = False
+        return True
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.start_calls.clear()
+        self.stop_calls.clear()
+    
+    def set_failure_on_start(self, should_fail: bool):
+        """Configure whether start() should fail."""
+        self.should_fail_start = should_fail
+
+
+class MockWebServerConfig:
+    """
+    Mock implementation of WebServerConfig for testing.
+    
+    This mock provides configurable web server settings for testing
+    different configuration scenarios.
+    """
+    
+    def __init__(self, **kwargs):
+        """
+        Initialize mock web server configuration.
+        
+        Args:
+            **kwargs: Configuration parameters to override defaults
+        """
+        # Default configuration
+        self.host = kwargs.get('host', '127.0.0.1')
+        self.port = kwargs.get('port', 8080)
+        self.debug = kwargs.get('debug', False)
+        self.static_folder = kwargs.get('static_folder', 'web/static')
+        self.max_queue_size = kwargs.get('max_queue_size', 100)
+        self.sse_heartbeat_interval = kwargs.get('sse_heartbeat_interval', 30)
+        self.reload = kwargs.get('reload', False)
+    
+    def to_dict(self):
+        """Convert configuration to dictionary."""
+        return {
+            'host': self.host,
+            'port': self.port,
+            'debug': self.debug,
+            'static_folder': self.static_folder,
+            'max_queue_size': self.max_queue_size,
+            'sse_heartbeat_interval': self.sse_heartbeat_interval,
+            'reload': self.reload
+        }
+    
+    def _validate_configuration(self) -> bool:
+        """
+        Validate mock configuration.
+        
+        Returns:
+            bool: Configuration validity status
+        """
+        # Track the call
+        self.validate_configuration_calls.append(())
+        
         if not self.configuration_valid:
             return False
         

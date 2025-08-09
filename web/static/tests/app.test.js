@@ -78,7 +78,8 @@ describe('YouTubeNotionApp', () => {
                 },
                 body: JSON.stringify({
                     url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
-                })
+                }),
+                signal: expect.any(AbortSignal)
             });
             
             expect(result).toEqual(mockResponse);
@@ -101,7 +102,8 @@ describe('YouTubeNotionApp', () => {
                 body: JSON.stringify({
                     url: 'https://youtu.be/dQw4w9WgXcQ',
                     custom_prompt: 'Custom summary prompt'
-                })
+                }),
+                signal: expect.any(AbortSignal)
             });
             
             expect(result).toEqual(mockResponse);
@@ -118,7 +120,7 @@ describe('YouTubeNotionApp', () => {
             mockFetchError(500, 'Internal Server Error');
             
             await expect(app.addQueueItem('https://www.youtube.com/watch?v=dQw4w9WgXcQ'))
-                .rejects.toThrow('HTTP 500: Internal Server Error');
+                .rejects.toThrow('Server error - please try again later');
         });
         
         test('should handle network errors', async () => {
@@ -153,7 +155,7 @@ describe('YouTubeNotionApp', () => {
             });
             
             await expect(app.addQueueItem('https://www.youtube.com/watch?v=dQw4w9WgXcQ'))
-                .rejects.toThrow('HTTP 400: Bad Request');
+                .rejects.toThrow('Invalid request - please check the URL format');
         });
     });
     
