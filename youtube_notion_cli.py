@@ -6,7 +6,9 @@ This script provides argument parsing for YouTube URL processing and example dat
 
 import argparse
 import sys
-from src.youtube_notion.main import main
+import webbrowser
+import time
+from src.youtube_notion.main import main, main_ui
 
 def parse_arguments():
     """Parse command-line arguments for the YouTube to Notion integration."""
@@ -20,6 +22,7 @@ Examples:
   %(prog)s --urls "https://youtu.be/abc123,https://youtu.be/def456"  # Process multiple URLs
   %(prog)s --file urls.txt                   # Process URLs from file (one per line)
   %(prog)s --url "https://youtu.be/abc123" --prompt "Custom summary prompt"
+  %(prog)s --ui                              # Start web UI mode for visual queue management
         """
     )
     
@@ -48,6 +51,12 @@ Examples:
         "--example-data",
         action="store_true",
         help="Use example data mode (default behavior)"
+    )
+    
+    input_group.add_argument(
+        "--ui",
+        action="store_true",
+        help="Start web UI mode for visual queue management"
     )
     
     parser.add_argument(
@@ -83,6 +92,20 @@ def main_cli():
     if args.prompt and not args.url:
         print("Error: --prompt can only be used with single --url", file=sys.stderr)
         sys.exit(1)
+    
+    # Check for UI mode first
+    if args.ui:
+        # UI mode - start web server and open browser
+        print("Starting YouTube-to-Notion Web UI...")
+        try:
+            success = main_ui()
+            sys.exit(0 if success else 1)
+        except KeyboardInterrupt:
+            print("\nShutting down web UI...")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error starting web UI: {e}", file=sys.stderr)
+            sys.exit(1)
     
     # Determine execution mode and collect URLs
     urls = []

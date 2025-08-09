@@ -27,6 +27,9 @@ from .utils.exceptions import (
     VideoUnavailableError,
     QuotaExceededError
 )
+from .processors.queue_manager import QueueManager
+from .web.server import WebServer
+from .web.config import WebServerConfig
 
 
 def load_application_config(youtube_mode: bool = False) -> Optional[ApplicationConfig]:
@@ -241,6 +244,130 @@ def main(youtube_url: Optional[str] = None, custom_prompt: Optional[str] = None,
             print("=" * 60)
         else:
             print(f"✗ Operation failed")
+        return False
+
+
+def main_ui() -> bool:
+    """
+    Main function for web UI mode.
+    
+    This function initializes the web server with queue management and starts
+    the UI interface. It automatically opens a web browser to the UI and
+    keeps the server running until interrupted.
+    
+    Returns:
+        bool: True if UI mode completed successfully, False otherwise
+    """
+    print("=" * 60)
+    print("YouTube to Notion Database Integration - Web UI Mode")
+    print("=" * 60)
+    print()
+    
+    try:
+        # Step 1: Load configuration for YouTube mode (UI needs full functionality)
+        print("1. Loading configuration...")
+        config = load_application_config(youtube_mode=True)
+        if not config:
+            print("Error: Configuration validation failed")
+            print("Web UI mode requires valid API keys for full functionality")
+            return False
+        print("✓ Configuration loaded and validated")
+        
+        # Step 2: Initialize components
+        print("\n2. Initializing components...")
+        factory = ComponentFactory(config)
+        metadata_extractor, summary_writer, storage = factory.create_all_components()
+        
+        # Create video processor
+        processor = VideoProcessor(metadata_extractor, summary_writer, storage)
+        processor.validate_configuration()
+        print("✓ Video processor initialized")
+        
+        # Create queue manager
+        queue_manager = QueueManager(processor)
+        print("✓ Queue manager initialized")
+        
+        # Step 3: Setup web server
+        print("\n3. Setting up web server...")
+        web_config = WebServerConfig.from_env()
+        web_server = WebServer(queue_manager, web_config)
+        print(f"✓ Web server configured on {web_config.host}:{web_config.port}")
+        
+        # Step 4: Start services
+        print("\n4. Starting services...")
+        queue_manager.start_processing()
+        print("✓ Queue processing started")
+        
+        web_server.start()
+        print("✓ Web server started")
+        
+        # Step 5: Open browser
+        server_url = f"http://{web_config.host}:{web_config.port}"
+        print(f"\n5. Opening web browser to {server_url}")
+        
+        # Wait a moment for server to fully start
+        import time
+        time.sleep(2)
+        
+        try:
+            import webbrowser
+            webbrowser.open(server_url)
+            print("✓ Browser opened successfully")
+        except Exception as e:
+            print(f"⚠ Could not open browser automatically: {e}")
+            print(f"Please manually open: {server_url}")
+        
+        # Step 6: Keep running
+        print("\n" + "=" * 60)
+        print("WEB UI RUNNING")
+        print("=" * 60)
+        print(f"Access the web interface at: {server_url}")
+        print("Press Ctrl+C to stop the server")
+        print("=" * 60)
+        
+        # Keep the main thread alive
+        try:
+            while web_server.is_running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n\nReceived shutdown signal...")
+        
+        # Step 7: Graceful shutdown
+        print("Shutting down services...")
+        
+        # Stop web server
+        if web_server.stop(timeout=5.0):
+            print("✓ Web server stopped")
+        else:
+            print("⚠ Web server shutdown timeout")
+        
+        # Stop queue processing
+        if queue_manager.stop_processing(timeout=5.0):
+            print("✓ Queue processing stopped")
+        else:
+            print("⚠ Queue processing shutdown timeout")
+        
+        print("\n" + "=" * 60)
+        print("WEB UI SHUTDOWN COMPLETE")
+        print("=" * 60)
+        
+        return True
+        
+    except ConfigurationError as e:
+        print(f"Error: Configuration error - {e}")
+        if hasattr(e, 'details') and e.details:
+            print(f"Details: {e.details}")
+        return False
+        
+    except ImportError as e:
+        print(f"Error: Failed to import required web components - {e}")
+        print("Please ensure all required dependencies are installed:")
+        print("  pip install fastapi uvicorn pydantic")
+        return False
+        
+    except Exception as e:
+        print(f"Error: Unexpected error during web UI startup - {e}")
+        print("Please check your configuration and try again.")
         return False
 
 
