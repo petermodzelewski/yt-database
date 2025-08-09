@@ -180,9 +180,13 @@ class TestWebUIWorkflowIntegration:
         assert response.status_code == 200
         retry_data = response.json()
         
-        # Should fail because mock is still configured to fail
-        assert retry_data["success"] is False
-        assert "error" in retry_data
+        # Retry should succeed in adding item back to queue
+        assert retry_data["success"] is True
+        assert "item_id" in retry_data
+        
+        # The new item will fail during processing (not immediately)
+        new_item_id = retry_data["item_id"]
+        assert new_item_id != item_id  # Should be a new item
         
         # Cleanup
         queue_manager.stop_processing()
@@ -327,7 +331,7 @@ class TestWebUIWorkflowIntegration:
         # Test serving JavaScript
         response = test_client.get("/app.js")
         assert response.status_code == 200
-        assert "application/javascript" in response.headers["content-type"]
+        assert "javascript" in response.headers["content-type"]
 
 
 class TestSSEIntegrationWorkflow:

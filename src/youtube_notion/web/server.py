@@ -404,7 +404,7 @@ class WebServer:
         # Create static directory if it doesn't exist
         static_path.mkdir(parents=True, exist_ok=True)
         
-        # Mount static files
+        # Mount static files at /static
         if static_path.exists():
             self.app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
         
@@ -417,6 +417,25 @@ class WebServer:
                 return FileResponse(str(index_path))
             else:
                 return {"message": "Web UI not yet implemented. Static files not found."}
+        
+        # Serve common static files directly at root level for compatibility
+        @self.app.get("/styles.css")
+        async def serve_styles():
+            """Serve styles.css directly."""
+            css_path = static_path / "styles.css"
+            if css_path.exists():
+                return FileResponse(str(css_path))
+            else:
+                raise HTTPException(status_code=404, detail="styles.css not found")
+        
+        @self.app.get("/app.js")
+        async def serve_app_js():
+            """Serve app.js directly."""
+            js_path = static_path / "app.js"
+            if js_path.exists():
+                return FileResponse(str(js_path))
+            else:
+                raise HTTPException(status_code=404, detail="app.js not found")
     
     def _setup_queue_listener(self) -> None:
         """Setup listener for queue status changes."""

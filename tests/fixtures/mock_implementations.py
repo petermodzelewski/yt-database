@@ -8,6 +8,8 @@ external dependencies and enable controlled testing scenarios.
 
 from typing import Dict, Any, Optional, List, Tuple
 from unittest.mock import Mock
+from pathlib import Path
+import tempfile
 
 from src.youtube_notion.interfaces.summary_writer import SummaryWriter
 from src.youtube_notion.interfaces.storage import Storage
@@ -50,6 +52,9 @@ class MockSummaryWriter(SummaryWriter):
         # Call tracking
         self.generate_summary_calls: List[Tuple[str, Dict[str, Any], Optional[str]]] = []
         self.validate_configuration_calls: List[tuple] = []
+        
+        # Mock chat logger for integration tests
+        self.chat_logger = MockChatLogger()
         
         # Default responses for common test scenarios
         self.default_summary = """# Video Summary
@@ -136,6 +141,11 @@ Mock summary completed successfully."""
         """Reset all call tracking for fresh test scenarios."""
         self.generate_summary_calls.clear()
         self.validate_configuration_calls.clear()
+    
+    def cleanup(self):
+        """Clean up mock resources."""
+        if hasattr(self, 'chat_logger') and hasattr(self.chat_logger, 'cleanup'):
+            self.chat_logger.cleanup()
     
     def set_response_for_url(self, url: str, response: str):
         """Set a specific response for a URL."""
@@ -854,6 +864,11 @@ class MockVideoProcessor:
         self.metadata_extractor.reset_calls()
         self.summary_writer.reset_calls()
         self.storage.reset_calls()
+    
+    def cleanup(self):
+        """Clean up mock resources."""
+        if hasattr(self.summary_writer, 'cleanup'):
+            self.summary_writer.cleanup()
 
 
 class MockWebServer:
@@ -1019,3 +1034,83 @@ class MockWebServerConfig:
         self.metadata_extractor.configuration_valid = valid
         self.summary_writer.configuration_valid = valid
         self.storage.configuration_valid = valid
+
+
+class MockChatLogger:
+    """
+    Mock implementation of ChatLogger for testing.
+    
+    This mock creates temporary chat log files that can be used in integration
+    tests to simulate real chat log functionality.
+    """
+    
+    def __init__(self):
+        """Initialize the mock chat logger."""
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.log_files = []
+        self.chunk_log_files = []
+        
+    def get_latest_log_path(self) -> str:
+        """
+        Get the path to the latest chat log file.
+        
+        Returns:
+            str: Path to the latest chat log file
+        """
+        if not self.log_files:
+            # Create a temporary chat log file
+            log_file = self.temp_dir / f"chat_log_{len(self.log_files)}.md"
+            log_content = """# Chat Log
+
+## Processing Started
+Starting video processing...
+
+## Metadata Extraction
+✓ Video metadata extracted successfully
+
+## AI Summary Generation
+✓ Summary generated using Gemini AI
+
+## Notion Storage
+✓ Video summary stored in Notion database
+
+## Processing Complete
+Video processing completed successfully.
+"""
+            log_file.write_text(log_content, encoding='utf-8')
+            self.log_files.append(str(log_file))
+        
+        return self.log_files[-1]
+    
+    def get_chunk_log_paths(self) -> List[str]:
+        """
+        Get paths to chunk log files.
+        
+        Returns:
+            List[str]: List of chunk log file paths
+        """
+        if not self.chunk_log_files:
+            # Create some mock chunk log files
+            for i in range(2):
+                chunk_file = self.temp_dir / f"chunk_log_{i}.md"
+                chunk_content = f"""# Chunk {i+1} Processing Log
+
+## Chunk Processing Started
+Processing chunk {i+1} of video...
+
+## AI Summary Generation
+✓ Chunk {i+1} summary generated
+
+## Chunk Processing Complete
+Chunk {i+1} processing completed successfully.
+"""
+                chunk_file.write_text(chunk_content, encoding='utf-8')
+                self.chunk_log_files.append(str(chunk_file))
+        
+        return self.chunk_log_files
+    
+    def cleanup(self):
+        """Clean up temporary files."""
+        import shutil
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)

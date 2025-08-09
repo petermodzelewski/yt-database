@@ -90,6 +90,10 @@ class QueueManager:
         if not url or not isinstance(url, str):
             raise ValueError("URL must be a non-empty string")
         
+        # Validate YouTube URL format
+        if not self._is_youtube_url(url):
+            raise ValueError("URL must be a valid YouTube URL")
+        
         with self._lock:
             # Check queue size limit
             if len(self._items) >= self.max_queue_size:
@@ -341,8 +345,36 @@ class QueueManager:
                 elif item.status == QueueStatus.FAILED:
                     status_counts['failed'] += 1
             
+            # Add both nested and flat format for compatibility
             current_stats['status_counts'] = status_counts
+            current_stats.update(status_counts)  # Add flat format
+            current_stats['total_items'] = len(self._items)
             return current_stats
+    
+    def _is_youtube_url(self, url: str) -> bool:
+        """
+        Check if URL is a valid YouTube URL.
+        
+        Args:
+            url: URL to validate
+            
+        Returns:
+            bool: True if URL is a valid YouTube URL
+        """
+        import re
+        
+        # YouTube URL patterns
+        youtube_patterns = [
+            r'(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
+            r'(?:https?://)?(?:www\.)?youtu\.be/([a-zA-Z0-9_-]+)',
+            r'(?:https?://)?(?:m\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)',
+        ]
+        
+        for pattern in youtube_patterns:
+            if re.match(pattern, url):
+                return True
+        
+        return False
     
     def clear_completed_items(self, max_age_hours: float = 24.0) -> int:
         """
