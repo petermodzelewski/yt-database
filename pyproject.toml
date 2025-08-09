@@ -23,11 +23,22 @@ classifiers = [
 dependencies = [
     "notion-client",
     "python-dotenv",
-    "pytest"
+    "pytest",
+    "google-genai>=0.1.0",
+    "google-api-python-client>=2.0.0",
+    "requests>=2.25.0",
+    "beautifulsoup4",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+    "pytest-asyncio>=0.21.0",
+    "hypothesis",
+    "httpx>=0.25.0"
 ]
 
 [project.scripts]
 youtube-notion = "youtube_notion.main:main"
+youtube-notion-ui = "youtube_notion.main:main_ui"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -34,6 +34,7 @@ setup(
     entry_points={
         "console_scripts": [
             "youtube-notion=youtube_notion.main:main",
+            "youtube-notion-ui=youtube_notion.main:main_ui",
         ],
     },
 )
