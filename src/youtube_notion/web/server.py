@@ -333,6 +333,60 @@ class WebServer:
                 }
             )
         
+        @self.app.post("/api/retry/{item_id}")
+        async def retry_item_endpoint(item_id: str) -> AddUrlResponse:
+            """
+            Retry a failed queue item.
+            
+            Args:
+                item_id: ID of the failed item to retry
+                
+            Returns:
+                AddUrlResponse: Success status and new item ID or error message
+            """
+            try:
+                # Get the failed item
+                failed_item = self.queue_manager.get_item_status(item_id)
+                if not failed_item:
+                    return AddUrlResponse(
+                        success=False,
+                        error=f"Item {item_id} not found"
+                    )
+                
+                from .models import QueueStatus
+                if failed_item.status != QueueStatus.FAILED:
+                    return AddUrlResponse(
+                        success=False,
+                        error=f"Item {item_id} is not in failed state"
+                    )
+                
+                # Re-add the item to the queue with same URL and custom prompt
+                new_item_id = self.queue_manager.enqueue(
+                    failed_item.url, 
+                    failed_item.custom_prompt
+                )
+                
+                return AddUrlResponse(
+                    success=True,
+                    item_id=new_item_id
+                )
+                
+            except ValueError as e:
+                return AddUrlResponse(
+                    success=False,
+                    error=str(e)
+                )
+            except VideoProcessingError as e:
+                return AddUrlResponse(
+                    success=False,
+                    error=f"Processing error: {str(e)}"
+                )
+            except Exception as e:
+                return AddUrlResponse(
+                    success=False,
+                    error=f"Server error: {str(e)}"
+                )
+
         @self.app.get("/health")
         async def health_check():
             """Health check endpoint."""

@@ -124,7 +124,26 @@ class SSEConnection {
     handleConnectionError(event) {
         console.error('SSEConnection: Connection error:', event);
         this.isConnected = false;
-        this.updateConnectionStatus(false);
+        
+        // Determine error type and message
+        let errorMessage = 'Connection lost';
+        
+        if (event.type === 'error' && this.eventSource) {
+            switch (this.eventSource.readyState) {
+                case EventSource.CONNECTING:
+                    errorMessage = 'Connecting...';
+                    break;
+                case EventSource.CLOSED:
+                    errorMessage = 'Connection closed';
+                    break;
+                default:
+                    errorMessage = 'Connection error';
+            }
+        } else if (event.type === 'heartbeat_timeout') {
+            errorMessage = 'Connection timeout';
+        }
+        
+        this.updateConnectionStatus(false, errorMessage);
         
         // Only attempt reconnection if not explicitly closed
         if (this.eventSource && this.eventSource.readyState !== EventSource.CLOSED) {
@@ -345,13 +364,17 @@ class SSEConnection {
     scheduleReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.error('SSEConnection: Max reconnection attempts reached');
-            this.updateConnectionStatus(false, 'Connection failed after multiple attempts');
+            this.updateConnectionStatus(false, 'Connection failed - click to retry');
+            this.showReconnectButton();
             return;
         }
         
         this.clearReconnectTimer();
         
         console.log(`SSEConnection: Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${this.reconnectDelay}ms`);
+        
+        // Update status to show reconnection attempt
+        this.updateConnectionStatus(false, `Reconnecting... (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
         
         this.reconnectTimer = setTimeout(() => {
             this.reconnectAttempts++;
@@ -363,6 +386,27 @@ class SSEConnection {
                 this.maxReconnectDelay
             );
         }, this.reconnectDelay);
+    }
+
+    /**
+     * Show manual reconnect button when max attempts reached
+     */
+    showReconnectButton() {
+        let indicator = document.getElementById('connection-indicator');
+        if (!indicator) return;
+
+        // Add click handler for manual reconnection
+        indicator.style.cursor = 'pointer';
+        indicator.title = 'Click to reconnect';
+        
+        const clickHandler = () => {
+            this.reconnect();
+            indicator.style.cursor = '';
+            indicator.title = '';
+            indicator.removeEventListener('click', clickHandler);
+        };
+        
+        indicator.addEventListener('click', clickHandler);
     }
 
     /**

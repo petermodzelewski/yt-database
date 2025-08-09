@@ -57,18 +57,33 @@ class YouTubeNotionApp {
             if (customPrompt) {
                 requestBody.custom_prompt = customPrompt;
             }
+
+            // Create AbortController for timeout handling
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
             
             const response = await fetch('/api/queue', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(requestBody),
+                signal: controller.signal
             });
             
+            clearTimeout(timeoutId);
+            
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                let errorData = {};
+                try {
+                    errorData = await response.json();
+                } catch (parseError) {
+                    console.warn('Failed to parse error response:', parseError);
+                }
+                
+                // Create descriptive error message based on status code
+                let errorMessage = errorData.error || this.getHttpErrorMessage(response.status);
+                throw new Error(errorMessage);
             }
             
             const result = await response.json();
@@ -86,7 +101,45 @@ class YouTubeNotionApp {
             
         } catch (error) {
             console.error('Failed to add URL to queue:', error);
+            
+            // Enhance error with network-specific information
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out - please try again');
+            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                throw new Error('Network error - please check your internet connection');
+            }
+            
             throw error;
+        }
+    }
+
+    /**
+     * Get user-friendly HTTP error message
+     * @param {number} status - HTTP status code
+     * @returns {string} Error message
+     */
+    getHttpErrorMessage(status) {
+        switch (status) {
+            case 400:
+                return 'Invalid request - please check the URL format';
+            case 401:
+                return 'Authentication error - please refresh the page';
+            case 403:
+                return 'Access denied - insufficient permissions';
+            case 404:
+                return 'Service not found - please refresh the page';
+            case 429:
+                return 'Too many requests - please wait a moment';
+            case 500:
+                return 'Server error - please try again later';
+            case 502:
+                return 'Service temporarily unavailable';
+            case 503:
+                return 'Service maintenance - please try again later';
+            case 504:
+                return 'Request timeout - please try again';
+            default:
+                return `Server error (${status}) - please try again`;
         }
     }
 

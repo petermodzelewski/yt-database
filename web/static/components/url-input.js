@@ -139,10 +139,79 @@ class UrlInput {
         try {
             // Call the main app's addQueueItem method
             await window.app.addQueueItem(url, customPrompt);
-            this.hide();
+            this.showSuccess('URL added to queue successfully!');
+            
+            // Hide modal after short delay to show success message
+            setTimeout(() => {
+                this.hide();
+            }, 1000);
+            
         } catch (error) {
-            this.showError(error.message || 'Failed to add URL to queue');
+            console.error('Failed to add URL:', error);
+            this.showError(this.getErrorMessage(error));
             this.setLoading(false);
+        }
+    }
+
+    /**
+     * Get user-friendly error message from error object
+     * @param {Error|Object} error - Error object or response
+     * @returns {string} User-friendly error message
+     */
+    getErrorMessage(error) {
+        // Handle network errors
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            return 'Network error - please check your internet connection';
+        }
+
+        // Handle timeout errors
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+            return 'Request timed out - please try again';
+        }
+
+        // Handle server errors
+        if (error.message.includes('HTTP 5')) {
+            return 'Server error - please try again later';
+        }
+
+        // Handle API errors
+        if (error.message.includes('HTTP 4')) {
+            return 'Invalid request - please check the URL format';
+        }
+
+        // Handle specific error messages
+        const message = error.message || 'Unknown error';
+        
+        if (message.includes('invalid') && message.includes('url')) {
+            return 'Please enter a valid YouTube URL';
+        }
+        
+        if (message.includes('queue') && message.includes('full')) {
+            return 'Queue is full - please wait for some items to complete';
+        }
+
+        if (message.includes('network') || message.includes('connection')) {
+            return 'Network connection error - please check your internet';
+        }
+
+        // Return original message if it's already user-friendly
+        if (message.length < 100 && !message.includes('Error:') && !message.includes('Exception:')) {
+            return message;
+        }
+
+        // Fallback for technical errors
+        return 'Failed to add URL to queue - please try again';
+    }
+
+    /**
+     * Show success message
+     * @param {string} message - Success message
+     */
+    showSuccess(message) {
+        if (this.errorElement) {
+            this.errorElement.textContent = message;
+            this.errorElement.classList.remove('active');
+            this.errorElement.classList.add('success', 'active');
         }
     }
 
@@ -186,7 +255,7 @@ class UrlInput {
     clearError() {
         if (this.errorElement) {
             this.errorElement.textContent = '';
-            this.errorElement.classList.remove('active');
+            this.errorElement.classList.remove('active', 'success');
         }
     }
 

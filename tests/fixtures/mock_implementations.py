@@ -755,3 +755,121 @@ class MockQueueManager:
         """Clear all failure configurations."""
         self.should_fail_enqueue = False
         self.fail_on_urls.clear()
+
+
+class MockVideoProcessor:
+    """
+    Mock implementation of VideoProcessor for testing.
+    
+    This mock provides a complete video processor interface with configurable
+    behavior for testing queue management and error handling scenarios.
+    """
+    
+    def __init__(self, should_fail: bool = False, 
+                 configuration_valid: bool = True):
+        """
+        Initialize the mock video processor.
+        
+        Args:
+            should_fail: If True, process_video will return False
+            configuration_valid: Whether validate_configuration should return True
+        """
+        self.should_fail = should_fail
+        self.configuration_valid = configuration_valid
+        
+        # Create mock components
+        self.metadata_extractor = MockMetadataExtractor(configuration_valid=configuration_valid)
+        self.summary_writer = MockSummaryWriter(configuration_valid=configuration_valid)
+        self.storage = MockStorage(configuration_valid=configuration_valid)
+        
+        # Call tracking
+        self.process_video_calls: List[Tuple[str, Optional[str]]] = []
+        self.validate_configuration_calls: List[tuple] = []
+        
+        # Mock methods for unittest.mock compatibility
+        self.process_video = Mock(side_effect=self._process_video)
+        self.validate_configuration = Mock(side_effect=self._validate_configuration)
+    
+    def _process_video(self, video_url: str, custom_prompt: Optional[str] = None) -> bool:
+        """
+        Process a video with mock behavior.
+        
+        Args:
+            video_url: YouTube URL to process
+            custom_prompt: Optional custom prompt
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Track the call
+        self.process_video_calls.append((video_url, custom_prompt))
+        
+        # Check if we should fail
+        if self.should_fail:
+            return False
+        
+        # Check configuration
+        if not self.configuration_valid:
+            return False
+        
+        # Simulate successful processing
+        try:
+            # Extract metadata
+            metadata = self.metadata_extractor.extract_metadata(video_url)
+            
+            # Generate summary
+            summary = self.summary_writer.generate_summary(video_url, metadata, custom_prompt)
+            
+            # Store result
+            video_data = {
+                "Title": metadata.get("title", "Unknown Title"),
+                "Channel": metadata.get("channel", "Unknown Channel"),
+                "Video URL": video_url,
+                "Cover": metadata.get("thumbnail_url", ""),
+                "Summary": summary
+            }
+            
+            success = self.storage.store_video_summary(video_data)
+            return success
+            
+        except Exception:
+            return False
+    
+    def _validate_configuration(self) -> bool:
+        """
+        Validate mock configuration.
+        
+        Returns:
+            bool: Configuration validity status
+        """
+        # Track the call
+        self.validate_configuration_calls.append(())
+        
+        if not self.configuration_valid:
+            return False
+        
+        # Validate all components
+        return (self.metadata_extractor.validate_configuration() and
+                self.summary_writer.validate_configuration() and
+                self.storage.validate_configuration())
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.process_video_calls.clear()
+        self.validate_configuration_calls.clear()
+        
+        # Reset component calls too
+        self.metadata_extractor.reset_calls()
+        self.summary_writer.reset_calls()
+        self.storage.reset_calls()
+    
+    def set_failure(self, should_fail: bool):
+        """Configure whether processing should fail."""
+        self.should_fail = should_fail
+    
+    def set_configuration_valid(self, valid: bool):
+        """Configure whether configuration should be valid."""
+        self.configuration_valid = valid
+        self.metadata_extractor.configuration_valid = valid
+        self.summary_writer.configuration_valid = valid
+        self.storage.configuration_valid = valid

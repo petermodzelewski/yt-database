@@ -117,11 +117,19 @@ class QueueColumns {
             itemElement.appendChild(progressBar);
         }
 
-        // Action buttons for completed items
-        if (item.status === 'completed') {
+        // Action buttons for completed and failed items
+        if (item.status === 'completed' || item.status === 'failed') {
             const actions = this.createActionButtons(item);
             if (actions) {
                 itemElement.appendChild(actions);
+            }
+        }
+
+        // Error details for failed items
+        if (item.status === 'failed' && item.error_message) {
+            const errorDetails = this.createErrorDetails(item);
+            if (errorDetails) {
+                itemElement.appendChild(errorDetails);
             }
         }
 
@@ -149,10 +157,136 @@ class QueueColumns {
             case 'completed':
                 return 'Completed successfully';
             case 'failed':
-                return item.error_message || 'Processing failed';
+                return this.getErrorDisplayText(item.error_message);
             default:
                 return 'Unknown status';
         }
+    }
+
+    /**
+     * Get user-friendly error display text with troubleshooting context
+     * @param {string|null} errorMessage - Raw error message from server
+     * @returns {string} User-friendly error message
+     */
+    getErrorDisplayText(errorMessage) {
+        if (!errorMessage) {
+            return 'Processing failed - Unknown error';
+        }
+
+        // Map common error patterns to user-friendly messages
+        const errorMappings = [
+            {
+                pattern: /invalid.*url/i,
+                message: 'Invalid YouTube URL',
+                context: 'Please check the URL format'
+            },
+            {
+                pattern: /network.*error|connection.*error|timeout/i,
+                message: 'Network connection error',
+                context: 'Check your internet connection'
+            },
+            {
+                pattern: /api.*key|authentication|unauthorized/i,
+                message: 'API authentication error',
+                context: 'Please check API configuration'
+            },
+            {
+                pattern: /video.*not.*found|404/i,
+                message: 'Video not found',
+                context: 'Video may be private or deleted'
+            },
+            {
+                pattern: /quota.*exceeded|rate.*limit/i,
+                message: 'API quota exceeded',
+                context: 'Please try again later'
+            },
+            {
+                pattern: /processing.*failed|summary.*generation.*error/i,
+                message: 'AI processing failed',
+                context: 'Try again or contact support'
+            },
+            {
+                pattern: /storage.*error|notion.*error/i,
+                message: 'Storage error',
+                context: 'Check Notion integration'
+            },
+            {
+                pattern: /server.*error|internal.*error/i,
+                message: 'Server error',
+                context: 'Please try again later'
+            }
+        ];
+
+        // Find matching error pattern
+        for (const mapping of errorMappings) {
+            if (mapping.pattern.test(errorMessage)) {
+                return mapping.message;
+            }
+        }
+
+        // Fallback to shortened original message
+        const shortMessage = errorMessage.length > 50 
+            ? errorMessage.substring(0, 47) + '...'
+            : errorMessage;
+        
+        return shortMessage;
+    }
+
+    /**
+     * Get detailed error context for troubleshooting
+     * @param {string|null} errorMessage - Raw error message from server
+     * @returns {string} Troubleshooting context
+     */
+    getErrorContext(errorMessage) {
+        if (!errorMessage) {
+            return 'Unknown error occurred. Please try again.';
+        }
+
+        // Map common error patterns to troubleshooting context
+        const errorMappings = [
+            {
+                pattern: /invalid.*url/i,
+                context: 'Please ensure the URL is a valid YouTube link (youtube.com or youtu.be)'
+            },
+            {
+                pattern: /network.*error|connection.*error|timeout/i,
+                context: 'Check your internet connection and try again. If the problem persists, the server may be temporarily unavailable.'
+            },
+            {
+                pattern: /api.*key|authentication|unauthorized/i,
+                context: 'The API credentials may be invalid or expired. Please contact an administrator.'
+            },
+            {
+                pattern: /video.*not.*found|404/i,
+                context: 'The video may be private, deleted, or the URL may be incorrect. Please verify the video is publicly accessible.'
+            },
+            {
+                pattern: /quota.*exceeded|rate.*limit/i,
+                context: 'The API usage limit has been reached. Please wait a few minutes before trying again.'
+            },
+            {
+                pattern: /processing.*failed|summary.*generation.*error/i,
+                context: 'The AI service encountered an error while processing the video. This may be due to video content or temporary service issues.'
+            },
+            {
+                pattern: /storage.*error|notion.*error/i,
+                context: 'Failed to save the summary to Notion. Please check the Notion integration settings and permissions.'
+            },
+            {
+                pattern: /server.*error|internal.*error/i,
+                context: 'An internal server error occurred. Please try again in a few minutes.'
+            }
+        ];
+
+        // Find matching error pattern
+        for (const mapping of errorMappings) {
+            if (mapping.pattern.test(errorMessage)) {
+                return mapping.context;
+            }
+        }
+
+        // Fallback context
+        return 'An unexpected error occurred. Please try again or contact support if the problem persists.';
     }
 
     /**
@@ -220,19 +354,59 @@ class QueueColumns {
     }
 
     /**
-     * Create action buttons for completed items
+     * Create action buttons for completed and failed items
      * @param {Object} item - Queue item
      * @returns {HTMLElement|null}
      */
     createActionButtons(item) {
         const buttons = [];
         
-        // Only show buttons for completed items
-        if (item.status !== 'completed') {
-            return null;
+        // Handle completed items
+        if (item.status === 'completed') {
+            // Main chat log button - always show for completed items
+            const viewLogBtn = this.createViewLogButton(item);
+            buttons.push(viewLogBtn);
+            
+            // Chunk log buttons for chunked videos
+            if (item.chunk_logs && item.chunk_logs.length > 0) {
+                item.chunk_logs.forEach((log, index) => {
+                    const chunkBtn = this.createChunkLogButton(item, index);
+                    buttons.push(chunkBtn);
+                });
+            }
         }
         
-        // Main chat log button - always show for completed items
+        // Handle failed items
+        if (item.status === 'failed') {
+            // Retry button for failed items
+            const retryBtn = this.createRetryButton(item);
+            buttons.push(retryBtn);
+            
+            // View error details button
+            const errorBtn = this.createErrorDetailsButton(item);
+            buttons.push(errorBtn);
+            
+            // View log button if chat log exists
+            if (item.chat_log_path) {
+                const viewLogBtn = this.createViewLogButton(item);
+                buttons.push(viewLogBtn);
+            }
+        }
+        
+        if (buttons.length === 0) return null;
+        
+        const actionsContainer = DOMUtils.createElement('div', { className: 'item-actions' });
+        buttons.forEach(button => actionsContainer.appendChild(button));
+        
+        return actionsContainer;
+    }
+
+    /**
+     * Create view log button
+     * @param {Object} item - Queue item
+     * @returns {HTMLElement}
+     */
+    createViewLogButton(item) {
         const viewLogBtn = DOMUtils.createElement('button', {
             className: 'action-btn eye-btn primary',
             title: 'View processing log'
@@ -249,37 +423,246 @@ class QueueColumns {
             window.app.showChatLog(item.id);
         });
         
-        buttons.push(viewLogBtn);
+        return viewLogBtn;
+    }
+
+    /**
+     * Create chunk log button
+     * @param {Object} item - Queue item
+     * @param {number} index - Chunk index
+     * @returns {HTMLElement}
+     */
+    createChunkLogButton(item, index) {
+        const chunkBtn = DOMUtils.createElement('button', {
+            className: 'action-btn eye-btn chunk-btn',
+            title: `View chunk ${index + 1} log`
+        });
         
-        // Chunk log buttons for chunked videos
-        if (item.chunk_logs && item.chunk_logs.length > 0) {
-            item.chunk_logs.forEach((log, index) => {
-                const chunkBtn = DOMUtils.createElement('button', {
-                    className: 'action-btn eye-btn chunk-btn',
-                    title: `View chunk ${index + 1} log`
-                });
-                
-                const chunkEyeIcon = DOMUtils.createElement('span', { className: 'eye-icon' }, '👁');
-                const chunkNumber = DOMUtils.createElement('span', { className: 'chunk-number' }, (index + 1).toString());
-                
-                chunkBtn.appendChild(chunkEyeIcon);
-                chunkBtn.appendChild(chunkNumber);
-                
-                DOMUtils.addEventListener(chunkBtn, 'click', (e) => {
-                    e.stopPropagation();
-                    window.app.showChatLog(item.id, index);
-                });
-                
-                buttons.push(chunkBtn);
+        const chunkEyeIcon = DOMUtils.createElement('span', { className: 'eye-icon' }, '👁');
+        const chunkNumber = DOMUtils.createElement('span', { className: 'chunk-number' }, (index + 1).toString());
+        
+        chunkBtn.appendChild(chunkEyeIcon);
+        chunkBtn.appendChild(chunkNumber);
+        
+        DOMUtils.addEventListener(chunkBtn, 'click', (e) => {
+            e.stopPropagation();
+            window.app.showChatLog(item.id, index);
+        });
+        
+        return chunkBtn;
+    }
+
+    /**
+     * Create retry button for failed items
+     * @param {Object} item - Queue item
+     * @returns {HTMLElement}
+     */
+    createRetryButton(item) {
+        const retryBtn = DOMUtils.createElement('button', {
+            className: 'action-btn retry-btn',
+            title: 'Retry processing this item'
+        });
+        
+        const retryIcon = DOMUtils.createElement('span', { className: 'retry-icon' }, '🔄');
+        const btnText = DOMUtils.createElement('span', { className: 'btn-text' }, 'Retry');
+        
+        retryBtn.appendChild(retryIcon);
+        retryBtn.appendChild(btnText);
+        
+        DOMUtils.addEventListener(retryBtn, 'click', async (e) => {
+            e.stopPropagation();
+            await this.handleRetry(item);
+        });
+        
+        return retryBtn;
+    }
+
+    /**
+     * Create error details button for failed items
+     * @param {Object} item - Queue item
+     * @returns {HTMLElement}
+     */
+    createErrorDetailsButton(item) {
+        const errorBtn = DOMUtils.createElement('button', {
+            className: 'action-btn error-btn',
+            title: 'View error details and troubleshooting'
+        });
+        
+        const errorIcon = DOMUtils.createElement('span', { className: 'error-icon' }, '⚠️');
+        const btnText = DOMUtils.createElement('span', { className: 'btn-text' }, 'Details');
+        
+        errorBtn.appendChild(errorIcon);
+        errorBtn.appendChild(btnText);
+        
+        DOMUtils.addEventListener(errorBtn, 'click', (e) => {
+            e.stopPropagation();
+            this.showErrorDetails(item);
+        });
+        
+        return errorBtn;
+    }
+
+    /**
+     * Handle retry functionality for failed items
+     * @param {Object} item - Failed queue item
+     */
+    async handleRetry(item) {
+        try {
+            // Show loading state
+            const retryBtn = document.querySelector(`[data-item-id="${item.id}"] .retry-btn`);
+            if (retryBtn) {
+                retryBtn.disabled = true;
+                retryBtn.innerHTML = '<span class="retry-icon spinning">🔄</span><span class="btn-text">Retrying...</span>';
+            }
+
+            // Call retry endpoint
+            const response = await fetch(`/api/retry/${item.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
             });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to retry item');
+            }
+            
+            // Show success feedback
+            this.showRetryFeedback(item.id, 'success', 'Item added back to queue');
+            
+        } catch (error) {
+            console.error('Retry failed:', error);
+            
+            // Show error feedback
+            this.showRetryFeedback(item.id, 'error', error.message || 'Failed to retry item');
+            
+            // Reset button state
+            const retryBtn = document.querySelector(`[data-item-id="${item.id}"] .retry-btn`);
+            if (retryBtn) {
+                retryBtn.disabled = false;
+                retryBtn.innerHTML = '<span class="retry-icon">🔄</span><span class="btn-text">Retry</span>';
+            }
         }
+    }
+
+    /**
+     * Show retry feedback to user
+     * @param {string} itemId - Item ID
+     * @param {string} type - 'success' or 'error'
+     * @param {string} message - Feedback message
+     */
+    showRetryFeedback(itemId, type, message) {
+        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+        if (!itemElement) return;
+
+        // Create feedback element
+        const feedback = DOMUtils.createElement('div', {
+            className: `retry-feedback ${type}`
+        }, message);
+
+        // Add to item
+        itemElement.appendChild(feedback);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (feedback.parentNode) {
+                feedback.parentNode.removeChild(feedback);
+            }
+        }, 3000);
+    }
+
+    /**
+     * Show detailed error information in a modal
+     * @param {Object} item - Failed queue item
+     */
+    showErrorDetails(item) {
+        const errorMessage = item.error_message || 'Unknown error';
+        const errorContext = this.getErrorContext(errorMessage);
         
-        if (buttons.length === 0) return null;
+        // Create error details modal content
+        const modalContent = `
+            <div class="error-details-modal">
+                <div class="error-summary">
+                    <h4>Processing Failed</h4>
+                    <p class="error-message">${this.getErrorDisplayText(errorMessage)}</p>
+                </div>
+                
+                <div class="error-context">
+                    <h5>What happened?</h5>
+                    <p>${errorContext}</p>
+                </div>
+                
+                <div class="error-actions">
+                    <h5>What can you do?</h5>
+                    <ul>
+                        <li>Click "Retry" to try processing again</li>
+                        <li>Check that the YouTube URL is valid and publicly accessible</li>
+                        <li>Verify your internet connection is stable</li>
+                        <li>Try again in a few minutes if it's a temporary service issue</li>
+                    </ul>
+                </div>
+                
+                <div class="error-technical">
+                    <details>
+                        <summary>Technical Details</summary>
+                        <pre class="error-raw">${errorMessage}</pre>
+                    </details>
+                </div>
+            </div>
+        `;
+
+        // Show in a modal (reuse chat log modal structure)
+        this.showCustomModal('Error Details', modalContent);
+    }
+
+    /**
+     * Show custom modal with content
+     * @param {string} title - Modal title
+     * @param {string} content - HTML content
+     */
+    showCustomModal(title, content) {
+        const modal = DOMUtils.getElementById('chat-modal-overlay');
+        const modalTitle = DOMUtils.getElementById('chat-modal-title');
+        const modalContent = DOMUtils.getElementById('chat-log-content');
         
-        const actionsContainer = DOMUtils.createElement('div', { className: 'item-actions' });
-        buttons.forEach(button => actionsContainer.appendChild(button));
+        if (modal && modalTitle && modalContent) {
+            modalTitle.textContent = title;
+            modalContent.innerHTML = content;
+            modal.classList.add('active');
+        }
+    }
+
+    /**
+     * Create error details section for failed items
+     * @param {Object} item - Failed queue item
+     * @returns {HTMLElement|null}
+     */
+    createErrorDetails(item) {
+        if (!item.error_message) return null;
+
+        const errorDetails = DOMUtils.createElement('div', { className: 'error-details' });
         
-        return actionsContainer;
+        const errorText = DOMUtils.createElement('div', { 
+            className: 'error-text' 
+        }, this.getErrorDisplayText(item.error_message));
+        
+        const errorHint = DOMUtils.createElement('div', { 
+            className: 'error-hint' 
+        }, 'Click "Details" for troubleshooting help');
+        
+        errorDetails.appendChild(errorText);
+        errorDetails.appendChild(errorHint);
+        
+        return errorDetails;
+    }
+
     }
 
     /**
