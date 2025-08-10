@@ -107,6 +107,17 @@ class UrlInput {
     }
 
     /**
+     * Set the URL value in the input field
+     * @param {string} url - The URL to set
+     */
+    setUrl(url) {
+        if (this.urlInput) {
+            this.urlInput.value = url;
+            this.validateInputRealTime();
+        }
+    }
+
+    /**
      * Reset form to initial state
      */
     reset() {
