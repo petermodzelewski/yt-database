@@ -104,9 +104,9 @@ Required disclaimer content:
 - Provide user-friendly error messages with troubleshooting context
 
 ### Testing Workflow
-- **Primary Python**: Unit tests for daily development (`python run_tests.py` - 478+ tests, ~6s)
+- **Primary Python**: Unit tests for daily development (`python run_tests.py` - 716 tests, ~24s)
 - **Primary JavaScript**: Frontend component tests (`npm test` - Jest framework)
-- **Secondary**: Integration tests for releases (`python run_integration_tests.py` - 13+ tests, ~90s)
+- **Secondary**: Integration tests for releases (`python run_integration_tests.py` - 26 tests, ~124s)
 - **Web UI Testing**: Manual testing via `--ui` mode for user workflows
 - Use mock implementations from `tests/fixtures/mock_implementations.py`
 - Unit tests must not perform I/O or call external APIs
