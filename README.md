@@ -186,6 +186,8 @@ The application supports three main modes of operation:
 
 The web UI mode provides a visual interface for managing video processing with a three-column layout inspired by YouTube's design.
 
+![Web UI Interface](img/ui.png)
+
 ### Starting Web UI Mode
 
 ```bash

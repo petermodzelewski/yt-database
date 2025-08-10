@@ -178,51 +178,36 @@ class WebServer:
                 HTTPException: If item not found or chat log unavailable
             """
             try:
-                print(f"DEBUG: Chat log request - item_id: {item_id}, chunk: {chunk}")
-                
                 # Get item from queue
                 item = self.queue_manager.get_item_status(item_id)
                 if not item:
-                    print(f"DEBUG: Item {item_id} not found in queue")
                     raise HTTPException(
                         status_code=404,
                         detail=f"Item {item_id} not found"
                     )
-                
-                print(f"DEBUG: Item found - chat_log_path: {item.chat_log_path}")
-                print(f"DEBUG: Item chunk_logs: {item.chunk_logs}")
                 
                 # Determine which chat log to retrieve
                 chat_log_path = None
                 
                 if chunk is not None:
                     # Request for specific chunk log
-                    print(f"DEBUG: Requesting chunk {chunk}")
                     if not item.chunk_logs or chunk < 0 or chunk >= len(item.chunk_logs):
-                        print(f"DEBUG: Chunk {chunk} not found - chunk_logs length: {len(item.chunk_logs) if item.chunk_logs else 0}")
                         raise HTTPException(
                             status_code=404,
                             detail=f"Chunk {chunk} not found for item {item_id}"
                         )
                     chat_log_path = Path(item.chunk_logs[chunk])
-                    print(f"DEBUG: Chunk log path: {chat_log_path}")
                 else:
                     # Request for main chat log
-                    print(f"DEBUG: Requesting main chat log")
                     if not item.chat_log_path:
-                        print(f"DEBUG: Main chat log path is None/empty")
                         raise HTTPException(
                             status_code=404,
                             detail=f"Chat log not available for item {item_id}"
                         )
                     chat_log_path = Path(item.chat_log_path)
-                    print(f"DEBUG: Main chat log path: {chat_log_path}")
                 
                 # Check if chat log file exists
-                print(f"DEBUG: Checking if file exists: {chat_log_path}")
-                print(f"DEBUG: File exists: {chat_log_path.exists()}")
                 if not chat_log_path.exists():
-                    print(f"DEBUG: File not found, returning 404")
                     raise HTTPException(
                         status_code=404,
                         detail=f"Chat log file not found: {chat_log_path}"
