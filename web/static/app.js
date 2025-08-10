@@ -38,6 +38,21 @@ class YouTubeNotionApp {
                 this.components.urlInput.show();
             });
         }
+
+        // Listen for paste events on the whole page
+        DOMUtils.addEventListener(document, 'paste', (e) => {
+            // Don't interfere with paste events in input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            if (pastedText && this.components.urlInput.validateUrl(pastedText)) {
+                e.preventDefault();
+                this.components.urlInput.show();
+                this.components.urlInput.setUrl(pastedText);
+            }
+        });
     }
 
     /**
