@@ -7,8 +7,11 @@ inclusion: always
 ## Core Stack & Dependencies
 
 **Python 3.12+** with `notion-client`, `google-genai>=0.1.0`, `python-dotenv`, `pytest`, `hypothesis`
+**Web UI**: FastAPI, Server-Sent Events (SSE), Vanilla JavaScript ES6+
 
 ### Key Dependencies
+
+#### Backend (Python)
 - `notion-client` - Official Notion API client
 - `google-genai>=0.1.0` - Google Gemini AI integration with FileData support
 - `google-api-python-client>=2.0.0` - YouTube Data API access
@@ -16,6 +19,16 @@ inclusion: always
 - `beautifulsoup4` - Enhanced HTML parsing for metadata extraction
 - `pytest` - Primary testing framework (unified across all tests)
 - `hypothesis` - Property-based testing for robust validation
+- `fastapi>=0.68.0` - Modern web framework for API and web UI
+- `uvicorn>=0.15.0` - ASGI server for FastAPI applications
+
+
+#### Frontend (JavaScript)
+- **Vanilla JavaScript ES6+** - No frameworks, modern browser features
+- **Server-Sent Events (SSE)** - Real-time updates from server
+- **CSS Grid & Flexbox** - Modern responsive layout
+- **Web Components Pattern** - Modular component architecture
+- **Jest** - JavaScript testing framework for unit tests
 
 ## Architecture Rules
 
@@ -39,15 +52,18 @@ from notion_client import Client
 ## Testing Standards
 
 ### Primary Development Workflow
-- **MANDATORY**: Run `python run_tests.py` for all development (478 tests, ~6s)
+- **MANDATORY**: Run `python run_tests.py` for all development (478+ tests, ~6s)
 - **NEVER**: Use direct `pytest` calls or print statements for validation
 - **REQUIRED**: Write unit tests for every functionality change
 - **REQUIRED**: Use mock implementations from `tests/fixtures/mock_implementations.py`
+- **JavaScript Testing**: Run `npm test` for frontend component tests
 
 ### Test Types
-- **Unit Tests** (`tests/unit/`): Fast, isolated, no external APIs
-- **Integration Tests** (`tests/integration/`): End-to-end with `.env-test` config
-- Run integration tests only before releases (13 tests, ~90s)
+- **Python Unit Tests** (`tests/unit/`): Fast, isolated, no external APIs
+- **Python Integration Tests** (`tests/integration/`): End-to-end with `.env-test` config
+- **JavaScript Unit Tests** (`web/static/tests/`): Frontend component testing with Jest
+- **Web UI Integration**: Manual testing via `--ui` mode for user workflows
+- Run integration tests only before releases (13+ tests, ~90s)
 
 ## Error Handling
 
@@ -116,30 +132,68 @@ from notion_client import Client
 - **Rich Content Support**: Tables with nested bold, italic, links formatting
 - **Modular Video Utils**: Extracted video processing utilities to separate module
 
+## Web UI Architecture
+
+### FastAPI Web Server
+- **Real-time Updates**: Server-Sent Events (SSE) for live status updates
+- **Queue Management**: Background processing with visual progress tracking
+- **Static File Serving**: HTML, CSS, JavaScript components
+- **RESTful API**: JSON endpoints for queue operations and chat logs
+- **Auto-launch**: Automatically opens browser on startup
+
+### Frontend Architecture
+- **Component-Based**: Modular JavaScript components (`url-input.js`, `queue-columns.js`, `sse-connection.js`)
+- **Three-Column Layout**: Queue → Processing → Completed (inspired by YouTube design)
+- **Real-time UI**: Live updates via SSE connection with debounced rendering
+- **Error Handling**: User-friendly error messages with retry capabilities
+- **Chat Log Viewer**: Modal interface for viewing AI conversation logs
+- **Responsive Design**: Works on desktop and mobile devices
+
+### JavaScript Testing
+- **Jest Framework**: Unit tests for all JavaScript components
+- **Mock SSE**: Simulated server-sent events for testing real-time features
+- **DOM Testing**: Component rendering and interaction validation
+- **Error Scenarios**: Comprehensive error handling test coverage
+
 ## Development Commands
 
 ```bash
 # Setup
 pip install -e .
 cp .env.example .env
+npm install  # Install JavaScript testing dependencies
 
 # Primary workflow
-python run_tests.py                    # Unit tests (daily use)
-python -m pytest tests/integration/   # Integration tests (releases only)
+python run_tests.py                    # Python unit tests (daily use)
+npm test                              # JavaScript unit tests
+python run_integration_tests.py       # Integration tests (releases only)
 
 # Application modes
-python youtube_notion_cli.py --example-data           # Default mode
-python youtube_notion_cli.py --url "VIDEO_URL"        # YouTube mode
-python youtube_notion_cli.py --urls "url1,url2,url3"  # Batch mode
-python youtube_notion_cli.py --file urls.txt          # Batch from file
+python youtube_notion_cli.py --ui                      # Web UI mode (recommended)
+python youtube_notion_cli.py --example-data           # CLI example data mode
+python youtube_notion_cli.py --url "VIDEO_URL"        # CLI YouTube mode
+python youtube_notion_cli.py --urls "url1,url2,url3"  # CLI batch mode
+python youtube_notion_cli.py --file urls.txt          # CLI batch from file
 ```
 
-## CLI Design
+## Application Design
 
-- Dual entry points: `youtube_notion_cli.py` (dev) and console script (installed)
-- Mutually exclusive argument groups for different modes
+### Multi-Modal Interface
+- **Web UI Mode** (`--ui`): Visual interface with real-time updates (recommended)
+- **CLI Modes**: Command-line interface for automation and scripting
+- **Dual Entry Points**: `youtube_notion_cli.py` (dev) and console script (installed)
+
+### CLI Features
+- **Mutually Exclusive Arguments**: Clear separation between different modes
 - **Batch Processing**: 
   - `--urls "url1,url2,url3"` for comma-separated URLs
   - `--file urls.txt` for file-based URL input
-- Use `batch_mode` parameter to control output verbosity
-- Custom prompts only supported with single `--url` (not batch modes)
+- **Output Control**: `batch_mode` parameter controls verbosity
+- **Custom Prompts**: Only supported with single `--url` (not batch modes)
+
+### Web UI Features
+- **Queue Management**: Visual drag-and-drop interface for video processing
+- **Real-time Progress**: Live updates on processing status and phases
+- **Chat Log Access**: View AI conversation logs for each video
+- **Error Recovery**: Retry failed items with improved error messages
+- **Chunked Video Support**: Special handling for long videos (>45 minutes)

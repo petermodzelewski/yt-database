@@ -5,6 +5,7 @@ Tests for chat logging functionality.
 import os
 import tempfile
 import shutil
+import time
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
@@ -148,6 +149,150 @@ class TestChatLogger:
         for file_path in video_files:
             assert file_path.exists()
             assert video_id in file_path.name
+    
+    def test_get_latest_log_path(self):
+        """Test getting the latest log file path."""
+        video_id = "test_video_latest"
+        
+        # Create test files with different timestamps
+        import time
+        test_files = []
+        for i in range(3):
+            filename = f"{video_id}_{i}_20240101_10000{i}.md"
+            filepath = Path(self.temp_dir) / filename
+            filepath.write_text(f"# Test Log File {i}\nTest content")
+            test_files.append(filepath)
+            time.sleep(0.01)  # Small delay to ensure different modification times
+        
+        # Get latest log path
+        latest_path = self.logger.get_latest_log_path(video_id)
+        
+        assert latest_path is not None
+        assert video_id in latest_path
+        assert latest_path.endswith('.md')
+        
+        # Should be the last created file
+        latest_file = Path(latest_path)
+        assert latest_file.exists()
+    
+    def test_get_latest_log_path_no_files(self):
+        """Test getting latest log path when no files exist."""
+        latest_path = self.logger.get_latest_log_path("nonexistent_video")
+        assert latest_path is None
+    
+    def test_get_latest_log_path_all_videos(self):
+        """Test getting latest log path across all videos."""
+        # Create files for different videos
+        video_ids = ["video1", "video2", "video3"]
+        for i, video_id in enumerate(video_ids):
+            filename = f"{video_id}_20240101_10000{i}.md"
+            filepath = Path(self.temp_dir) / filename
+            filepath.write_text(f"# Test Log File {i}\nTest content")
+            time.sleep(0.01)  # Ensure different modification times
+        
+        # Get latest across all videos (no video_id filter)
+        latest_path = self.logger.get_latest_log_path()
+        
+        assert latest_path is not None
+        assert "video3" in latest_path  # Should be the last created
+    
+    def test_get_chunk_log_paths(self):
+        """Test getting chunk log file paths."""
+        video_id = "chunked_video_123"
+        
+        # Create chunk log files in non-sequential order
+        chunk_files = [
+            f"{video_id}_chunk_2_20240101_100000.md",
+            f"{video_id}_chunk_0_20240101_100001.md", 
+            f"{video_id}_chunk_1_20240101_100002.md",
+            f"{video_id}_chunk_10_20240101_100003.md"  # Test double-digit sorting
+        ]
+        
+        # Create the files
+        for filename in chunk_files:
+            filepath = Path(self.temp_dir) / filename
+            filepath.write_text(f"# Chunk Log File\nChunk content for {filename}")
+        
+        # Get chunk log paths
+        chunk_paths = self.logger.get_chunk_log_paths(video_id)
+        
+        assert len(chunk_paths) == 4
+        
+        # Verify they are sorted by chunk index
+        chunk_indices = []
+        for path in chunk_paths:
+            filename = Path(path).stem
+            # Extract chunk index from filename
+            parts = filename.split('_')
+            chunk_idx = None
+            for i, part in enumerate(parts):
+                if part == 'chunk' and i + 1 < len(parts):
+                    chunk_idx = int(parts[i + 1])
+                    break
+            chunk_indices.append(chunk_idx)
+        
+        assert chunk_indices == [0, 1, 2, 10]  # Should be sorted numerically
+        
+        # Verify all files exist
+        for path in chunk_paths:
+            assert os.path.exists(path)
+            assert video_id in path
+            assert "chunk" in path
+    
+    def test_get_chunk_log_paths_no_chunks(self):
+        """Test getting chunk log paths when no chunk files exist."""
+        chunk_paths = self.logger.get_chunk_log_paths("no_chunks_video")
+        assert chunk_paths == []
+    
+    def test_get_chunk_log_paths_mixed_files(self):
+        """Test getting chunk log paths with mixed file types."""
+        video_id = "mixed_video_456"
+        
+        # Create mix of regular and chunk log files
+        files = [
+            f"{video_id}_20240101_100000.md",  # Regular log
+            f"{video_id}_chunk_0_20240101_100001.md",  # Chunk log
+            f"{video_id}_chunk_1_20240101_100002.md",  # Chunk log
+            f"{video_id}_summary_20240101_100003.md",  # Other type
+        ]
+        
+        for filename in files:
+            filepath = Path(self.temp_dir) / filename
+            filepath.write_text(f"# Log File\nContent for {filename}")
+        
+        # Get only chunk log paths
+        chunk_paths = self.logger.get_chunk_log_paths(video_id)
+        
+        assert len(chunk_paths) == 2
+        for path in chunk_paths:
+            assert "chunk" in path
+            assert video_id in path
+    
+    def test_get_chunk_log_paths_invalid_chunk_indices(self):
+        """Test handling of invalid chunk indices in filenames."""
+        video_id = "invalid_chunks_789"
+        
+        # Create files with invalid chunk indices
+        files = [
+            f"{video_id}_chunk_abc_20240101_100000.md",  # Non-numeric
+            f"{video_id}_chunk_0_20240101_100001.md",    # Valid
+            f"{video_id}_chunk__20240101_100002.md",     # Missing index
+            f"{video_id}_chunk_1_20240101_100003.md",    # Valid
+        ]
+        
+        for filename in files:
+            filepath = Path(self.temp_dir) / filename
+            filepath.write_text(f"# Log File\nContent for {filename}")
+        
+        # Get chunk log paths - should handle invalid indices gracefully
+        chunk_paths = self.logger.get_chunk_log_paths(video_id)
+        
+        # Should return all files but with invalid ones sorted to beginning (index 0)
+        assert len(chunk_paths) == 4
+        
+        # Valid chunks should still be in correct order
+        valid_chunks = [path for path in chunk_paths if "_chunk_0_" in path or "_chunk_1_" in path]
+        assert len(valid_chunks) == 2
 
 
 class TestGeminiSummaryWriterLogging:

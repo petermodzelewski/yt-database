@@ -48,3 +48,24 @@ chat_logs/
 # Batch files (example)
 batch.txt
 *.batch
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Package lock files (keep package.json, exclude lock files)
+package-lock.json
+yarn.lock
+
+# Test coverage
+coverage/
+*.lcov
+
+# Jest cache
+.jest/
+
+# Manual test files (development only)
+**/test-manual.html
+**/manual-test.*

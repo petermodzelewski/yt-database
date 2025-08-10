@@ -16,9 +16,34 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - Use structured exception hierarchy from `utils/exceptions.py`
 
 ### Operation Modes
-- **Default**: Example data mode (no API keys required)
-- **YouTube**: Live processing with `GEMINI_API_KEY` 
+- **Web UI Mode** (`--ui`): Visual interface with real-time updates (recommended)
+- **CLI Example Data** (`--example-data`): Demo mode with no API keys required
+- **CLI YouTube** (`--url`): Single video processing via command line
+- **CLI Batch** (`--urls`, `--file`): Multiple video processing via command line
 - **Test**: Integration tests use `.env-test` with "YT Summaries [TEST]" database
+
+## Web UI Standards
+
+### User Interface Design
+- **Three-Column Layout**: Queue → Processing → Completed (inspired by YouTube design)
+- **Real-time Updates**: Server-Sent Events (SSE) for live status updates
+- **Responsive Design**: Works on desktop and mobile devices
+- **Visual Progress**: Clear indication of processing phases and progress
+- **Error Recovery**: User-friendly error messages with retry capabilities
+
+### Queue Management
+- **Background Processing**: Videos process asynchronously with visual feedback
+- **Status Tracking**: Real-time updates on processing phases (metadata, AI, storage)
+- **Chat Log Access**: View AI conversation logs for each video (main + chunks)
+- **Drag-and-Drop**: Visual interface for managing video queue
+- **Batch Support**: Add multiple URLs simultaneously
+
+### Real-time Features
+- **Server-Sent Events**: Live updates without page refresh
+- **Debounced Updates**: Efficient rendering with batched UI updates
+- **Connection Recovery**: Automatic reconnection on network issues
+- **Progress Indicators**: Visual feedback for long-running operations
+- **Error Notifications**: Toast-style error messages with context
 
 ## Content Standards
 
@@ -65,10 +90,13 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - Provide user-friendly error messages with troubleshooting context
 
 ### Testing Workflow
-- **Primary**: Unit tests for daily development (`python run_tests.py` - 478 tests, ~6s)
-- **Secondary**: Integration tests for releases (`python -m pytest tests/integration/` - 13 tests, ~90s)
+- **Primary Python**: Unit tests for daily development (`python run_tests.py` - 478+ tests, ~6s)
+- **Primary JavaScript**: Frontend component tests (`npm test` - Jest framework)
+- **Secondary**: Integration tests for releases (`python run_integration_tests.py` - 13+ tests, ~90s)
+- **Web UI Testing**: Manual testing via `--ui` mode for user workflows
 - Use mock implementations from `tests/fixtures/mock_implementations.py`
 - Unit tests must not perform I/O or call external APIs
+- JavaScript tests use Jest with mocked SSE connections
 
 ### Database Integration
 - Use `NotionStorage` implementation of `Storage` interface
@@ -78,3 +106,28 @@ YouTube-to-Notion Integration processes YouTube videos and creates AI-generated 
 - Map video metadata to Notion page properties (including duration)
 - Handle Notion's 100-block limit with automatic batching (first 100 blocks + append remaining)
 - Support long-form content from chunked video processing
+
+## Web Architecture Standards
+
+### FastAPI Server Design
+- **RESTful API**: JSON endpoints for queue operations and status
+- **Server-Sent Events**: Real-time streaming updates to web clients
+- **Static File Serving**: HTML, CSS, JavaScript components
+- **Static File Serving**: Direct serving of HTML, CSS, JavaScript files
+- **Auto-launch**: Automatically opens browser on startup
+- **Error Handling**: Structured HTTP error responses with context
+
+### Frontend Architecture
+- **Vanilla JavaScript**: ES6+ features, no external frameworks
+- **Component-Based**: Modular components (`url-input.js`, `queue-columns.js`, `sse-connection.js`)
+- **Event-Driven**: Custom events for component communication
+- **State Management**: Local state with SSE synchronization
+- **Error Boundaries**: Graceful error handling with user feedback
+- **Accessibility**: ARIA labels and keyboard navigation support
+
+### Queue Management System
+- **Background Processing**: `QueueManager` handles async video processing
+- **Status Tracking**: Real-time updates on processing phases
+- **Chat Log Integration**: Both main logs and chunk logs accessible
+- **Error Recovery**: Retry failed items with improved error context
+- **Memory Management**: Efficient handling of large video queues

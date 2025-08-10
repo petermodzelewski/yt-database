@@ -1,0 +1,16 @@
+# Development and testing dependencies
+-r requirements.txt
+
+# Additional testing libraries for web UI
+selenium>=4.0.0
+pytest-mock>=3.10.0
+pytest-cov>=4.0.0
+
+# Development tools
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Web testing specific
+pytest-asyncio>=0.21.0
+httpx>=0.25.0

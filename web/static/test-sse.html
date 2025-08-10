@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>SSE Connection Test</h1>
+    
+    <div id="status" class="status disconnected">
+        Status: Disconnected
+    </div>
+    
+    <div>
+        <button id="connect-btn" class="btn-primary">Connect</button>
+        <button id="disconnect-btn" class="btn-secondary">Disconnect</button>
+        <button id="clear-log-btn" class="btn-secondary">Clear Log</button>
+    </div>
+    
+    <h2>Event Log</h2>
+    <div id="log" class="log"></div>
+    
+    <h2>Connection Statistics</h2>
+    <div id="stats"></div>
+
+    <script>
+        class SSETestApp {
+            constructor() {
+                this.eventSource = null;
+                this.isConnected = false;
+                this.logElement = document.getElementById('log');
+                this.statusElement = document.getElementById('status');
+                this.statsElement = document.getElementById('stats');
+                
+                this.setupEventListeners();
+                this.updateStats();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('connect-btn').addEventListener('click', () => {
+                    this.connect();
+                });
+                
+                document.getElementById('disconnect-btn').addEventListener('click', () => {
+                    this.disconnect();
+                });
+                
+                document.getElementById('clear-log-btn').addEventListener('click', () => {
+                    this.clearLog();
+                });
+            }
+            
+            connect() {
+                if (this.eventSource) {
+                    this.disconnect();
+                }
+                
+                this.log('Connecting to /events...');
+                
+                try {
+                    // Add test_mode parameter to get only initial status
+                    this.eventSource = new EventSource('/events?test_mode=initial_only');
+                    
+                    this.eventSource.onopen = (event) => {
+                        this.isConnected = true;
+                        this.updateStatus('Connected', true);
+                        this.log('✅ Connected successfully');
+                        this.updateStats();
+                    };
+                    
+                    this.eventSource.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.log(`📨 Received: ${data.type}`, data);
+                        } catch (error) {
+                            this.log(`❌ Failed to parse message: ${error.message}`, event.data);
+                        }
+                    };
+                    
+                    this.eventSource.onerror = (event) => {
+                        this.isConnected = false;
+                        this.updateStatus('Connection Error', false);
+                        this.log('❌ Connection error occurred');
+                        this.updateStats();
+                    };
+                    
+                } catch (error) {
+                    this.log(`❌ Failed to create EventSource: ${error.message}`);
+                }
+            }
+            
+            disconnect() {
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                }
+                
+                this.isConnected = false;
+                this.updateStatus('Disconnected', false);
+                this.log('🔌 Disconnected');
+                this.updateStats();
+            }
+            
+            updateStatus(message, connected) {
+                this.statusElement.textContent = `Status: ${message}`;
+                this.statusElement.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            }
+            
+            log(message, data = null) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.innerHTML = `<strong>${timestamp}</strong>: ${message}`;
+                
+                if (data) {
+                    const dataElement = document.createElement('pre');
+                    dataElement.style.fontSize = '12px';
+                    dataElement.style.color = '#666';
+                    dataElement.style.marginTop = '5px';
+                    dataElement.textContent = JSON.stringify(data, null, 2);
+                    logEntry.appendChild(dataElement);
+                }
+                
+                this.logElement.appendChild(logEntry);
+                this.logElement.scrollTop = this.logElement.scrollHeight;
+            }
+            
+            clearLog() {
+                this.logElement.innerHTML = '';
+            }
+            
+            updateStats() {
+                const stats = {
+                    isConnected: this.isConnected,
+                    readyState: this.eventSource ? this.eventSource.readyState : 'N/A',
+                    url: this.eventSource ? this.eventSource.url : 'N/A'
+                };
+                
+                this.statsElement.innerHTML = `
+                    <strong>Connected:</strong> ${stats.isConnected}<br>
+                    <strong>Ready State:</strong> ${stats.readyState}<br>
+                    <strong>URL:</strong> ${stats.url}
+                `;
+            }
+        }
+        
+        // Initialize the test app
+        document.addEventListener('DOMContentLoaded', () => {
+            window.testApp = new SSETestApp();
+        });
+    </script>
+</body>
+</html>

@@ -68,6 +68,40 @@ class TestCLIArgumentParsing:
         with patch('sys.argv', ['youtube_notion_cli.py', '--url', test_url, '--example-data']):
             with pytest.raises(SystemExit):
                 youtube_notion_cli.parse_arguments()
+    
+    def test_parse_arguments_ui_mode(self):
+        """Test UI mode argument parsing."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            args = youtube_notion_cli.parse_arguments()
+            assert args.ui is True
+            assert args.url is None
+            assert args.example_data is False
+            assert args.prompt is None
+    
+    def test_parse_arguments_ui_mutually_exclusive_with_url(self):
+        """Test that --ui and --url are mutually exclusive."""
+        test_url = "https://www.youtube.com/watch?v=abc123"
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui', '--url', test_url]):
+            with pytest.raises(SystemExit):
+                youtube_notion_cli.parse_arguments()
+    
+    def test_parse_arguments_ui_mutually_exclusive_with_example_data(self):
+        """Test that --ui and --example-data are mutually exclusive."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui', '--example-data']):
+            with pytest.raises(SystemExit):
+                youtube_notion_cli.parse_arguments()
+    
+    def test_parse_arguments_ui_mutually_exclusive_with_urls(self):
+        """Test that --ui and --urls are mutually exclusive."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui', '--urls', 'url1,url2']):
+            with pytest.raises(SystemExit):
+                youtube_notion_cli.parse_arguments()
+    
+    def test_parse_arguments_ui_mutually_exclusive_with_file(self):
+        """Test that --ui and --file are mutually exclusive."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui', '--file', 'urls.txt']):
+            with pytest.raises(SystemExit):
+                youtube_notion_cli.parse_arguments()
 
 
 class TestCLIValidation:
@@ -90,6 +124,16 @@ class TestCLIValidation:
                     youtube_notion_cli.main_cli()
                 assert exc_info.value.code == 1
                 assert "Error: --prompt can only be used with single --url" in mock_stderr.getvalue()
+    
+    def test_ui_mode_prevents_url_processing(self):
+        """Test that UI mode doesn't process command line URLs."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with patch('youtube_notion_cli.main_ui') as mock_main_ui:
+                mock_main_ui.return_value = True
+                with pytest.raises(SystemExit) as exc_info:
+                    youtube_notion_cli.main_cli()
+                assert exc_info.value.code == 0
+                mock_main_ui.assert_called_once()
 
 
 class TestCLIExecution:
@@ -125,6 +169,48 @@ class TestCLIExecution:
         with patch('sys.argv', ['youtube_notion_cli.py', '--url', test_url, '--prompt', test_prompt]):
             youtube_notion_cli.main_cli()
             mock_main.assert_called_once_with(youtube_url=test_url, custom_prompt=test_prompt)
+    
+    @patch('youtube_notion_cli.main_ui')
+    def test_main_cli_ui_mode(self, mock_main_ui):
+        """Test that main_ui is called for UI mode."""
+        mock_main_ui.return_value = True
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with pytest.raises(SystemExit) as exc_info:
+                youtube_notion_cli.main_cli()
+            assert exc_info.value.code == 0
+            mock_main_ui.assert_called_once()
+    
+    @patch('youtube_notion_cli.main_ui')
+    def test_main_cli_ui_mode_failure(self, mock_main_ui):
+        """Test that UI mode failure exits with error code."""
+        mock_main_ui.return_value = False
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with pytest.raises(SystemExit) as exc_info:
+                youtube_notion_cli.main_cli()
+            assert exc_info.value.code == 1
+            mock_main_ui.assert_called_once()
+    
+    @patch('youtube_notion_cli.main_ui')
+    def test_main_cli_ui_mode_keyboard_interrupt(self, mock_main_ui):
+        """Test that UI mode handles KeyboardInterrupt gracefully."""
+        mock_main_ui.side_effect = KeyboardInterrupt()
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                with pytest.raises(SystemExit) as exc_info:
+                    youtube_notion_cli.main_cli()
+                assert exc_info.value.code == 0
+                assert "Shutting down web UI..." in mock_stdout.getvalue()
+    
+    @patch('youtube_notion_cli.main_ui')
+    def test_main_cli_ui_mode_exception(self, mock_main_ui):
+        """Test that UI mode handles exceptions gracefully."""
+        mock_main_ui.side_effect = Exception("Test error")
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with patch('sys.stderr', new_callable=StringIO) as mock_stderr:
+                with pytest.raises(SystemExit) as exc_info:
+                    youtube_notion_cli.main_cli()
+                assert exc_info.value.code == 1
+                assert "Error starting web UI: Test error" in mock_stderr.getvalue()
 
 
 class TestCLIHelpAndUsage:
@@ -149,6 +235,8 @@ class TestCLIHelpAndUsage:
                 assert "--example-data" in help_output
                 assert "--url" in help_output
                 assert "--prompt" in help_output
+                assert "--ui" in help_output
+                assert "Start web UI mode for visual queue management" in help_output
 
 
 class TestCLIIntegration:
@@ -170,4 +258,50 @@ class TestCLIIntegration:
         with patch('sys.argv', ['youtube_notion_cli.py', '--url', test_url, '--prompt', test_prompt]):
             youtube_notion_cli.main_cli()
             mock_main.assert_called_once_with(youtube_url=test_url, custom_prompt=test_prompt)
+    
+    @patch('youtube_notion_cli.main_ui')
+    def test_cli_integration_ui_mode(self, mock_main_ui):
+        """Test full CLI integration with UI mode."""
+        mock_main_ui.return_value = True
+        
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with pytest.raises(SystemExit) as exc_info:
+                youtube_notion_cli.main_cli()
+            assert exc_info.value.code == 0
+            mock_main_ui.assert_called_once()
+
+
+class TestUIModeFunctionality:
+    """Test UI mode specific functionality."""
+    
+    def test_ui_mode_argument_isolation(self):
+        """Test that UI mode is properly isolated from other arguments."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            args = youtube_notion_cli.parse_arguments()
+            assert args.ui is True
+            assert args.url is None
+            assert args.urls is None
+            assert args.file is None
+            assert args.example_data is False
+            assert args.prompt is None
+    
+    @patch('youtube_notion_cli.main_ui')
+    def test_ui_mode_browser_opening_simulation(self, mock_main_ui):
+        """Test that UI mode attempts to open browser."""
+        mock_main_ui.return_value = True
+        
+        with patch('sys.argv', ['youtube_notion_cli.py', '--ui']):
+            with pytest.raises(SystemExit) as exc_info:
+                youtube_notion_cli.main_cli()
+            assert exc_info.value.code == 0
+            mock_main_ui.assert_called_once()
+    
+    def test_ui_mode_help_text(self):
+        """Test that UI mode help text is descriptive."""
+        with patch('sys.argv', ['youtube_notion_cli.py', '--help']):
+            with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                with pytest.raises(SystemExit):
+                    youtube_notion_cli.parse_arguments()
+                help_output = mock_stdout.getvalue()
+                assert "Start web UI mode for visual queue management" in help_output
 

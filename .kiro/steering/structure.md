@@ -21,7 +21,12 @@ src/youtube_notion/              # Main package (use relative imports)
 ├── storage/                     # Data persistence
 │   └── notion_storage.py
 ├── processors/                  # Orchestration layer
-│   └── video_processor.py       # Main orchestrator
+│   ├── video_processor.py       # Main orchestrator
+│   └── queue_manager.py         # Web UI queue management
+├── web/                         # Web UI components
+│   ├── server.py                # FastAPI web server
+│   ├── config.py                # Web server configuration
+│   └── models.py                # Data models for web interface
 ├── config/                      # Configuration & DI
 │   ├── factory.py               # Component factory
 │   ├── settings.py              # Environment config
@@ -31,6 +36,19 @@ src/youtube_notion/              # Main package (use relative imports)
     ├── chat_logger.py           # Conversation logging
     ├── video_utils.py           # Video processing utilities
     └── markdown_converter.py
+
+web/static/                      # Frontend assets (served by FastAPI)
+├── index.html                   # Main HTML page
+├── style.css                    # Application styles
+├── components/                  # JavaScript components
+│   ├── url-input.js             # URL input and validation
+│   ├── queue-columns.js         # Three-column queue interface
+│   └── sse-connection.js        # Server-Sent Events handling
+└── tests/                       # JavaScript unit tests
+    ├── url-input.test.js        # URL input component tests
+    ├── queue-columns.test.js    # Queue interface tests
+    ├── sse-connection.test.js   # SSE connection tests
+    └── error-handling.test.js   # Error handling tests
 ```
 
 ## Architecture Patterns
@@ -64,7 +82,12 @@ success = processor.process_video(url)
 | `extractors/` | YouTube metadata | URL validation, video ID extraction, metadata retrieval |
 | `writers/` | AI summary generation | Gemini AI integration with streaming and retry logic |
 | `storage/` | Data persistence | Notion database operations with rich text conversion |
-| `processors/` | Workflow orchestration | Coordinates all components through dependency injection |
+| `processors/video_processor.py` | Core workflow orchestration | Coordinates all components through dependency injection |
+| `processors/queue_manager.py` | Web UI queue management | Background processing, status tracking, SSE updates |
+| `web/server.py` | FastAPI web server | HTTP endpoints, SSE streaming, static file serving |
+| `web/config.py` | Web server configuration | Server settings and configuration management |
+| `web/models.py` | Web data models | Data structures for queue items and web interface |
+| `web/static/components/` | JavaScript components | Modular frontend components with ES6+ |
 | `config/factory.py` | Dependency injection | Creates and configures components based on environment |
 | `utils/exceptions.py` | Error handling | Structured exception hierarchy |
 | `utils/chat_logger.py` | Conversation logging | Automatic cleanup and structured logging |
@@ -119,7 +142,7 @@ import google.generativeai as genai
 ### Test Directory Structure
 ```
 tests/
-├── unit/                        # Fast, isolated tests (478 tests, ~6s)
+├── unit/                        # Fast, isolated Python tests (478+ tests, ~6s)
 │   ├── test_video_metadata_extractor.py
 │   ├── test_gemini_summary_writer.py
 │   ├── test_notion_storage.py
@@ -128,19 +151,31 @@ tests/
 │   ├── test_main.py
 │   ├── test_property_based_markdown_converter.py  # Property-based tests
 │   ├── test_video_utils.py      # Video processing utilities tests
+│   ├── processors/              # Processor component tests
+│   │   └── test_queue_manager.py
+│   ├── web/                     # Web component tests
+│   │   └── test_server.py
 │   └── utils/
 │       ├── test_exceptions.py
 │       ├── test_chat_logger.py
 │       └── test_markdown_converter.py
-├── integration/                 # End-to-end tests (13 tests, ~90s)
+├── integration/                 # End-to-end tests (13+ tests, ~90s)
 │   ├── test_youtube_integration.py
 │   ├── test_notion_integration.py
-│   └── test_full_pipeline.py
+│   ├── test_full_pipeline.py
+│   └── test_web_integration.py  # Web UI integration tests
 ├── fixtures/                    # Test data and mocks
 │   ├── mock_implementations.py  # Mock components for unit tests
 │   ├── sample_video_data.py     # Test video metadata
 │   └── notion_test_data.py      # Sample Notion responses
 └── conftest.py                  # Pytest configuration and shared fixtures
+
+web/static/tests/                # JavaScript unit tests (Jest)
+├── url-input.test.js            # URL input component tests
+├── queue-columns.test.js        # Queue interface tests
+├── sse-connection.test.js       # SSE connection tests
+├── error-handling.test.js       # Error handling tests
+└── jest.config.js               # Jest configuration
 ```
 
 ### Testing Strategy
@@ -205,16 +240,18 @@ cp .env.example .env
 
 **Testing** (primary development workflow):
 ```bash
-python run_tests.py                    # Unit tests (fast, ~6 seconds)
-python -m pytest tests/integration/   # Integration tests (slow, ~90 seconds)
+python run_tests.py                    # Python unit tests (fast, ~6 seconds)
+npm test                              # JavaScript unit tests (Jest)
+python run_integration_tests.py       # Integration tests (slow, ~90 seconds)
 ```
 
 **Running application**:
 ```bash
-python youtube_notion_cli.py --example-data  # Default mode
-python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # YouTube mode
-python youtube_notion_cli.py --urls "url1,url2,url3"  # Batch mode
-python youtube_notion_cli.py --file urls.txt  # Batch from file
+python youtube_notion_cli.py --ui                      # Web UI mode (recommended)
+python youtube_notion_cli.py --example-data           # CLI example data mode
+python youtube_notion_cli.py --url "https://youtu.be/VIDEO_ID"  # CLI YouTube mode
+python youtube_notion_cli.py --urls "url1,url2,url3"  # CLI batch mode
+python youtube_notion_cli.py --file urls.txt          # CLI batch from file
 ```
 
 ## Key Architecture Rules

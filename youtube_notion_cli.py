@@ -6,7 +6,9 @@ This script provides argument parsing for YouTube URL processing and example dat
 
 import argparse
 import sys
-from src.youtube_notion.main import main
+import webbrowser
+import time
+from src.youtube_notion.main import main, main_ui, main_batch
 
 def parse_arguments():
     """Parse command-line arguments for the YouTube to Notion integration."""
@@ -20,6 +22,7 @@ Examples:
   %(prog)s --urls "https://youtu.be/abc123,https://youtu.be/def456"  # Process multiple URLs
   %(prog)s --file urls.txt                   # Process URLs from file (one per line)
   %(prog)s --url "https://youtu.be/abc123" --prompt "Custom summary prompt"
+  %(prog)s --ui                              # Start web UI mode for visual queue management
         """
     )
     
@@ -48,6 +51,12 @@ Examples:
         "--example-data",
         action="store_true",
         help="Use example data mode (default behavior)"
+    )
+    
+    input_group.add_argument(
+        "--ui",
+        action="store_true",
+        help="Start web UI mode for visual queue management"
     )
     
     parser.add_argument(
@@ -84,6 +93,20 @@ def main_cli():
         print("Error: --prompt can only be used with single --url", file=sys.stderr)
         sys.exit(1)
     
+    # Check for UI mode first
+    if args.ui:
+        # UI mode - start web server and open browser
+        print("Starting YouTube-to-Notion Web UI...")
+        try:
+            success = main_ui()
+            sys.exit(0 if success else 1)
+        except KeyboardInterrupt:
+            print("\nShutting down web UI...")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error starting web UI: {e}", file=sys.stderr)
+            sys.exit(1)
+    
     # Determine execution mode and collect URLs
     urls = []
     
@@ -112,43 +135,9 @@ def main_cli():
         # Single URL - use existing main function
         main(youtube_url=urls[0], custom_prompt=args.prompt)
     else:
-        # Multiple URLs - process each one
-        print(f"Processing {len(urls)} YouTube URLs...")
-        print("=" * 60)
-        
-        success_count = 0
-        failed_urls = []
-        
-        for i, url in enumerate(urls, 1):
-            print(f"\n[{i}/{len(urls)}] Processing: {url}")
-            print("-" * 40)
-            
-            try:
-                success = main(youtube_url=url, custom_prompt=None, batch_mode=True)
-                if success:
-                    success_count += 1
-                else:
-                    failed_urls.append(url)
-            except Exception as e:
-                print(f"✗ Error processing {url}: {e}")
-                failed_urls.append(url)
-        
-        # Summary
-        print("\n" + "=" * 60)
-        print("BATCH PROCESSING SUMMARY")
-        print("=" * 60)
-        print(f"Total URLs processed: {len(urls)}")
-        print(f"Successful: {success_count}")
-        print(f"Failed: {len(failed_urls)}")
-        
-        if failed_urls:
-            print("\nFailed URLs:")
-            for url in failed_urls:
-                print(f"  - {url}")
-            sys.exit(1)
-        else:
-            print("\n✓ All URLs processed successfully!")
-            sys.exit(0)
+        # Multiple URLs - use QueueManager for batch processing
+        success = main_batch(urls)
+        sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
     main_cli()

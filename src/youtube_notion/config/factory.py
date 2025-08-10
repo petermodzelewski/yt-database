@@ -10,12 +10,12 @@ from ..interfaces.summary_writer import SummaryWriter
 from typing import TYPE_CHECKING
 
 from ..interfaces.storage import Storage
-from ..extractors.video_metadata_extractor import VideoMetadataExtractor
 from ..utils.chat_logger import ChatLogger
 from .settings import ApplicationConfig, YouTubeProcessorConfig, NotionConfig
 from ..utils.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
+    from ..extractors.video_metadata_extractor import VideoMetadataExtractor
     from ..writers.gemini_summary_writer import GeminiSummaryWriter
     from ..storage.notion_storage import NotionStorage
 
@@ -149,7 +149,7 @@ class ComponentFactory:
                 f"Failed to create storage backend: {str(e)}"
             )
     
-    def create_metadata_extractor(self) -> VideoMetadataExtractor:
+    def create_metadata_extractor(self) -> 'VideoMetadataExtractor':
         """
         Create a configured metadata extractor implementation.
         
@@ -173,6 +173,9 @@ class ComponentFactory:
             if self.config.youtube_processor:
                 timeout_seconds = self.config.youtube_processor.timeout_seconds
             
+            # Import locally to avoid circular imports
+            from ..extractors.video_metadata_extractor import VideoMetadataExtractor
+            
             # Create VideoMetadataExtractor with configuration
             extractor = VideoMetadataExtractor(
                 youtube_api_key=youtube_api_key,
@@ -188,7 +191,7 @@ class ComponentFactory:
                 f"Failed to create metadata extractor: {str(e)}"
             )
     
-    def create_all_components(self, chat_logger: Optional[ChatLogger] = None) -> tuple[VideoMetadataExtractor, SummaryWriter, Storage]:
+    def create_all_components(self, chat_logger: Optional[ChatLogger] = None) -> tuple['VideoMetadataExtractor', SummaryWriter, Storage]:
         """
         Create all configured components for video processing.
         

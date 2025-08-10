@@ -8,6 +8,8 @@ external dependencies and enable controlled testing scenarios.
 
 from typing import Dict, Any, Optional, List, Tuple
 from unittest.mock import Mock
+from pathlib import Path
+import tempfile
 
 from src.youtube_notion.interfaces.summary_writer import SummaryWriter
 from src.youtube_notion.interfaces.storage import Storage
@@ -50,6 +52,9 @@ class MockSummaryWriter(SummaryWriter):
         # Call tracking
         self.generate_summary_calls: List[Tuple[str, Dict[str, Any], Optional[str]]] = []
         self.validate_configuration_calls: List[tuple] = []
+        
+        # Mock chat logger for integration tests
+        self.chat_logger = MockChatLogger()
         
         # Default responses for common test scenarios
         self.default_summary = """# Video Summary
@@ -136,6 +141,11 @@ Mock summary completed successfully."""
         """Reset all call tracking for fresh test scenarios."""
         self.generate_summary_calls.clear()
         self.validate_configuration_calls.clear()
+    
+    def cleanup(self):
+        """Clean up mock resources."""
+        if hasattr(self, 'chat_logger') and hasattr(self.chat_logger, 'cleanup'):
+            self.chat_logger.cleanup()
     
     def set_response_for_url(self, url: str, response: str):
         """Set a specific response for a URL."""
@@ -534,3 +544,576 @@ def create_mixed_mocks() -> Tuple[MockMetadataExtractor, MockSummaryWriter, Mock
     )
     
     return metadata_extractor, summary_writer, storage
+
+
+class MockQueueManager:
+    """
+    Mock implementation of QueueManager for testing web server functionality.
+    
+    This mock provides in-memory queue management and can simulate various
+    scenarios for testing the web UI components.
+    """
+    
+    def __init__(self):
+        """Initialize the mock queue manager."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        import uuid
+        
+        # In-memory storage
+        self.items: Dict[str, QueueItem] = {}
+        self.status_listeners: List = []
+        
+        # Call tracking
+        self.enqueue_calls: List[Tuple[str, Optional[str]]] = []
+        self.get_queue_status_calls: List[tuple] = []
+        self.get_item_status_calls: List[str] = []
+        self.add_status_listener_calls: List = []
+        self.remove_status_listener_calls: List = []
+        self.start_processing_calls: List[tuple] = []
+        self.stop_processing_calls: List[tuple] = []
+        
+        # Mock state
+        self.processing_started = False
+        self.should_fail_enqueue = False
+        self.fail_on_urls: List[str] = []
+        
+        # Mock methods for unittest.mock compatibility
+        self.enqueue = Mock(side_effect=self._enqueue)
+        self.get_queue_status = Mock(side_effect=self._get_queue_status)
+        self.get_item_status = Mock(side_effect=self._get_item_status)
+        self.add_status_listener = Mock(side_effect=self._add_status_listener)
+        self.remove_status_listener = Mock(side_effect=self._remove_status_listener)
+        self.start_processing = Mock(side_effect=self._start_processing)
+        self.stop_processing = Mock(side_effect=self._stop_processing)
+        self.get_statistics = Mock(side_effect=self._get_statistics)
+    
+    def _enqueue(self, url: str, custom_prompt: Optional[str] = None) -> str:
+        """Add a URL to the processing queue."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        import uuid
+        
+        # Track the call
+        self.enqueue_calls.append((url, custom_prompt))
+        
+        # Check if we should fail
+        if self.should_fail_enqueue or url in self.fail_on_urls:
+            from src.youtube_notion.utils.exceptions import VideoProcessingError
+            raise VideoProcessingError(f"Mock enqueue failed for {url}")
+        
+        # Create new queue item
+        item_id = str(uuid.uuid4())[:8]  # Short ID for testing
+        item = QueueItem(
+            id=item_id,
+            url=url,
+            custom_prompt=custom_prompt,
+            status=QueueStatus.TODO,
+            created_at=datetime.now()
+        )
+        
+        # Store the item
+        self.items[item_id] = item
+        
+        # Notify listeners
+        self._notify_status_change(item_id, item)
+        
+        return item_id
+    
+    def _get_queue_status(self) -> Dict[str, List]:
+        """Get current queue status organized by processing state."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        # Track the call
+        self.get_queue_status_calls.append(())
+        
+        # Organize items by status
+        status_dict = {
+            'todo': [],
+            'in_progress': [],
+            'completed': [],
+            'failed': []
+        }
+        
+        for item in self.items.values():
+            if item.status == QueueStatus.TODO:
+                status_dict['todo'].append(item)
+            elif item.status == QueueStatus.IN_PROGRESS:
+                status_dict['in_progress'].append(item)
+            elif item.status == QueueStatus.COMPLETED:
+                status_dict['completed'].append(item)
+            elif item.status == QueueStatus.FAILED:
+                status_dict['failed'].append(item)
+        
+        return status_dict
+    
+    def _get_item_status(self, item_id: str):
+        """Get status of a specific queue item."""
+        # Track the call
+        self.get_item_status_calls.append(item_id)
+        
+        return self.items.get(item_id)
+    
+    def _add_status_listener(self, callback):
+        """Add a status change listener."""
+        # Track the call
+        self.add_status_listener_calls.append(callback)
+        
+        if callback not in self.status_listeners:
+            self.status_listeners.append(callback)
+    
+    def _remove_status_listener(self, callback):
+        """Remove a status change listener."""
+        # Track the call
+        self.remove_status_listener_calls.append(callback)
+        
+        if callback in self.status_listeners:
+            self.status_listeners.remove(callback)
+    
+    def _start_processing(self):
+        """Start processing queue items."""
+        # Track the call
+        self.start_processing_calls.append(())
+        
+        self.processing_started = True
+    
+    def _stop_processing(self):
+        """Stop processing queue items."""
+        # Track the call
+        self.stop_processing_calls.append(())
+        
+        self.processing_started = False
+    
+    def _get_statistics(self) -> Dict[str, int]:
+        """Get queue statistics."""
+        from src.youtube_notion.web.models import QueueStatus
+        
+        stats = {
+            'total_items': len(self.items),
+            'todo': 0,
+            'in_progress': 0,
+            'completed': 0,
+            'failed': 0
+        }
+        
+        for item in self.items.values():
+            if item.status == QueueStatus.TODO:
+                stats['todo'] += 1
+            elif item.status == QueueStatus.IN_PROGRESS:
+                stats['in_progress'] += 1
+            elif item.status == QueueStatus.COMPLETED:
+                stats['completed'] += 1
+            elif item.status == QueueStatus.FAILED:
+                stats['failed'] += 1
+        
+        return stats
+    
+    def _notify_status_change(self, item_id: str, item):
+        """Notify all listeners of status change."""
+        for listener in self.status_listeners:
+            try:
+                listener(item_id, item)
+            except Exception:
+                # Ignore listener errors in mock
+                pass
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.enqueue_calls.clear()
+        self.get_queue_status_calls.clear()
+        self.get_item_status_calls.clear()
+        self.add_status_listener_calls.clear()
+        self.remove_status_listener_calls.clear()
+        self.start_processing_calls.clear()
+        self.stop_processing_calls.clear()
+    
+    def clear_queue(self):
+        """Clear all queue items."""
+        self.items.clear()
+    
+    def add_mock_item(self, item_id: str, url: str, status=None):
+        """Add a mock item to the queue for testing."""
+        from src.youtube_notion.web.models import QueueItem, QueueStatus
+        from datetime import datetime
+        
+        if status is None:
+            from src.youtube_notion.web.models import QueueStatus
+            status = QueueStatus.TODO
+        
+        item = QueueItem(
+            id=item_id,
+            url=url,
+            status=status,
+            created_at=datetime.now()
+        )
+        
+        self.items[item_id] = item
+        return item
+    
+    def set_item_status(self, item_id: str, status):
+        """Set the status of a specific item."""
+        if item_id in self.items:
+            self.items[item_id].status = status
+            self._notify_status_change(item_id, self.items[item_id])
+    
+    def set_failure_for_url(self, url: str):
+        """Configure a specific URL to fail on enqueue."""
+        if url not in self.fail_on_urls:
+            self.fail_on_urls.append(url)
+    
+    def clear_failures(self):
+        """Clear all failure configurations."""
+        self.should_fail_enqueue = False
+        self.fail_on_urls.clear()
+
+
+class MockVideoProcessor:
+    """
+    Mock implementation of VideoProcessor for testing.
+    
+    This mock provides a complete video processor interface with configurable
+    behavior for testing queue management and error handling scenarios.
+    """
+    
+    def __init__(self, should_fail: bool = False, 
+                 configuration_valid: bool = True):
+        """
+        Initialize the mock video processor.
+        
+        Args:
+            should_fail: If True, process_video will return False
+            configuration_valid: Whether validate_configuration should return True
+        """
+        self.should_fail = should_fail
+        self.configuration_valid = configuration_valid
+        
+        # Create mock components
+        self.metadata_extractor = MockMetadataExtractor(configuration_valid=configuration_valid)
+        self.summary_writer = MockSummaryWriter(configuration_valid=configuration_valid)
+        self.storage = MockStorage(configuration_valid=configuration_valid)
+        
+        # Call tracking
+        self.process_video_calls: List[Tuple[str, Optional[str]]] = []
+        self.validate_configuration_calls: List[tuple] = []
+        
+        # Mock methods for unittest.mock compatibility
+        self.process_video = Mock(side_effect=self._process_video)
+        self.validate_configuration = Mock(side_effect=self._validate_configuration)
+    
+    def _process_video(self, video_url: str, custom_prompt: Optional[str] = None) -> bool:
+        """
+        Process a video with mock behavior.
+        
+        Args:
+            video_url: YouTube URL to process
+            custom_prompt: Optional custom prompt
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Track the call
+        self.process_video_calls.append((video_url, custom_prompt))
+        
+        # Check if we should fail
+        if self.should_fail:
+            return False
+        
+        # Check configuration
+        if not self.configuration_valid:
+            return False
+        
+        # Simulate successful processing
+        try:
+            # Extract metadata
+            metadata = self.metadata_extractor.extract_metadata(video_url)
+            
+            # Generate summary
+            summary = self.summary_writer.generate_summary(video_url, metadata, custom_prompt)
+            
+            # Store result
+            video_data = {
+                "Title": metadata.get("title", "Unknown Title"),
+                "Channel": metadata.get("channel", "Unknown Channel"),
+                "Video URL": video_url,
+                "Cover": metadata.get("thumbnail_url", ""),
+                "Summary": summary
+            }
+            
+            success = self.storage.store_video_summary(video_data)
+            return success
+            
+        except Exception:
+            return False
+    
+    def _validate_configuration(self) -> bool:
+        """
+        Validate mock configuration.
+        
+        Returns:
+            bool: Configuration validity status
+        """
+        # Track the call
+        self.validate_configuration_calls.append(())
+        
+        return self.configuration_valid
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.process_video_calls.clear()
+        self.validate_configuration_calls.clear()
+        self.metadata_extractor.reset_calls()
+        self.summary_writer.reset_calls()
+        self.storage.reset_calls()
+    
+    def cleanup(self):
+        """Clean up mock resources."""
+        if hasattr(self.summary_writer, 'cleanup'):
+            self.summary_writer.cleanup()
+
+
+class MockWebServer:
+    """
+    Mock implementation of WebServer for testing.
+    
+    This mock provides a complete web server interface with configurable
+    behavior for testing web UI components and integration scenarios.
+    """
+    
+    def __init__(self, queue_manager=None, config=None, should_fail_start: bool = False):
+        """
+        Initialize the mock web server.
+        
+        Args:
+            queue_manager: Mock queue manager instance
+            config: Mock web server configuration
+            should_fail_start: If True, start() will raise an exception
+        """
+        self.queue_manager = queue_manager
+        self.config = config or self._create_default_config()
+        self.should_fail_start = should_fail_start
+        
+        # Server state
+        self.is_running = False
+        self.port = self.config.port if hasattr(self.config, 'port') else 8080
+        
+        # Call tracking
+        self.start_calls: List[tuple] = []
+        self.stop_calls: List[tuple] = []
+        
+        # Mock methods for unittest.mock compatibility
+        self.start = Mock(side_effect=self._start)
+        self.stop = Mock(side_effect=self._stop)
+    
+    def _create_default_config(self):
+        """Create a default mock configuration."""
+        from unittest.mock import Mock
+        config = Mock()
+        config.port = 8080
+        config.host = "127.0.0.1"
+        config.debug = False
+        return config
+    
+    def _start(self):
+        """
+        Start the mock web server.
+        
+        Raises:
+            RuntimeError: If server is already running or configured to fail
+        """
+        # Track the call
+        self.start_calls.append(())
+        
+        if self.is_running:
+            raise RuntimeError("Server is already running")
+        
+        if self.should_fail_start:
+            raise RuntimeError("Mock server configured to fail on start")
+        
+        self.is_running = True
+    
+    def _stop(self, timeout: float = 5.0) -> bool:
+        """
+        Stop the mock web server.
+        
+        Args:
+            timeout: Maximum time to wait for shutdown
+            
+        Returns:
+            bool: True if stopped successfully, False otherwise
+        """
+        # Track the call
+        self.stop_calls.append((timeout,))
+        
+        if not self.is_running:
+            return True
+        
+        self.is_running = False
+        return True
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.start_calls.clear()
+        self.stop_calls.clear()
+    
+    def set_failure_on_start(self, should_fail: bool):
+        """Configure whether start() should fail."""
+        self.should_fail_start = should_fail
+
+
+class MockWebServerConfig:
+    """
+    Mock implementation of WebServerConfig for testing.
+    
+    This mock provides configurable web server settings for testing
+    different configuration scenarios.
+    """
+    
+    def __init__(self, **kwargs):
+        """
+        Initialize mock web server configuration.
+        
+        Args:
+            **kwargs: Configuration parameters to override defaults
+        """
+        # Default configuration
+        self.host = kwargs.get('host', '127.0.0.1')
+        self.port = kwargs.get('port', 8080)
+        self.debug = kwargs.get('debug', False)
+        self.static_folder = kwargs.get('static_folder', 'web/static')
+        self.max_queue_size = kwargs.get('max_queue_size', 100)
+        self.sse_heartbeat_interval = kwargs.get('sse_heartbeat_interval', 30)
+        self.reload = kwargs.get('reload', False)
+    
+    def to_dict(self):
+        """Convert configuration to dictionary."""
+        return {
+            'host': self.host,
+            'port': self.port,
+            'debug': self.debug,
+            'static_folder': self.static_folder,
+            'max_queue_size': self.max_queue_size,
+            'sse_heartbeat_interval': self.sse_heartbeat_interval,
+            'reload': self.reload
+        }
+    
+    def _validate_configuration(self) -> bool:
+        """
+        Validate mock configuration.
+        
+        Returns:
+            bool: Configuration validity status
+        """
+        # Track the call
+        self.validate_configuration_calls.append(())
+        
+        if not self.configuration_valid:
+            return False
+        
+        # Validate all components
+        return (self.metadata_extractor.validate_configuration() and
+                self.summary_writer.validate_configuration() and
+                self.storage.validate_configuration())
+    
+    def reset_calls(self):
+        """Reset all call tracking for fresh test scenarios."""
+        self.process_video_calls.clear()
+        self.validate_configuration_calls.clear()
+        
+        # Reset component calls too
+        self.metadata_extractor.reset_calls()
+        self.summary_writer.reset_calls()
+        self.storage.reset_calls()
+    
+    def set_failure(self, should_fail: bool):
+        """Configure whether processing should fail."""
+        self.should_fail = should_fail
+    
+    def set_configuration_valid(self, valid: bool):
+        """Configure whether configuration should be valid."""
+        self.configuration_valid = valid
+        self.metadata_extractor.configuration_valid = valid
+        self.summary_writer.configuration_valid = valid
+        self.storage.configuration_valid = valid
+
+
+class MockChatLogger:
+    """
+    Mock implementation of ChatLogger for testing.
+    
+    This mock creates temporary chat log files that can be used in integration
+    tests to simulate real chat log functionality.
+    """
+    
+    def __init__(self):
+        """Initialize the mock chat logger."""
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.log_files = []
+        self.chunk_log_files = []
+        
+    def get_latest_log_path(self, video_id: str = None) -> str:
+        """
+        Get the path to the latest chat log file.
+        
+        Args:
+            video_id: Optional video ID (ignored in mock)
+        
+        Returns:
+            str: Path to the latest chat log file
+        """
+        if not self.log_files:
+            # Create a temporary chat log file
+            log_file = self.temp_dir / f"chat_log_{len(self.log_files)}.md"
+            log_content = """# Chat Log
+
+## Processing Started
+Starting video processing...
+
+## Metadata Extraction
+✓ Video metadata extracted successfully
+
+## AI Summary Generation
+✓ Summary generated using Gemini AI
+
+## Notion Storage
+✓ Video summary stored in Notion database
+
+## Processing Complete
+Video processing completed successfully.
+"""
+            log_file.write_text(log_content, encoding='utf-8')
+            self.log_files.append(str(log_file))
+        
+        return self.log_files[-1]
+    
+    def get_chunk_log_paths(self) -> List[str]:
+        """
+        Get paths to chunk log files.
+        
+        Returns:
+            List[str]: List of chunk log file paths
+        """
+        if not self.chunk_log_files:
+            # Create some mock chunk log files
+            for i in range(2):
+                chunk_file = self.temp_dir / f"chunk_log_{i}.md"
+                chunk_content = f"""# Chunk {i+1} Processing Log
+
+## Chunk Processing Started
+Processing chunk {i+1} of video...
+
+## AI Summary Generation
+✓ Chunk {i+1} summary generated
+
+## Chunk Processing Complete
+Chunk {i+1} processing completed successfully.
+"""
+                chunk_file.write_text(chunk_content, encoding='utf-8')
+                self.chunk_log_files.append(str(chunk_file))
+        
+        return self.chunk_log_files
+    
+    def cleanup(self):
+        """Clean up temporary files."""
+        import shutil
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)

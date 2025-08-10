@@ -11,8 +11,7 @@ from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
 from ..utils.exceptions import ConfigurationError
-
-
+from .web_config import WebServerConfig
 from .constants import DEFAULT_SUMMARY_PROMPT
 
 
@@ -82,18 +81,20 @@ class ApplicationConfig:
     # Component configurations
     notion: NotionConfig
     youtube_processor: Optional[YouTubeProcessorConfig] = None
+    web_server: Optional[WebServerConfig] = None
     
     # Application settings
     debug: bool = False
     verbose: bool = False
     
     @classmethod
-    def from_environment(cls, youtube_mode: bool = False) -> 'ApplicationConfig':
+    def from_environment(cls, youtube_mode: bool = False, web_mode: bool = False) -> 'ApplicationConfig':
         """
         Create configuration from environment variables.
         
         Args:
             youtube_mode: Whether YouTube processing is enabled
+            web_mode: Whether web UI mode is enabled
             
         Returns:
             ApplicationConfig: Configured application settings
@@ -135,10 +136,16 @@ class ApplicationConfig:
                 gemini_max_output_tokens=int(env_vars.get("GEMINI_MAX_OUTPUT_TOKENS", "4000"))
             )
         
+        # Create web server configuration if needed
+        web_config = None
+        if web_mode:
+            web_config = WebServerConfig.from_environment()
+        
         # Create application configuration
         return cls(
             notion=notion_config,
             youtube_processor=youtube_config,
+            web_server=web_config,
             debug=env_vars.get("DEBUG", "false").lower() == "true",
             verbose=env_vars.get("VERBOSE", "false").lower() == "true"
         )
@@ -191,7 +198,14 @@ def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]
         "GEMINI_TEMPERATURE": float,
         "GEMINI_MAX_OUTPUT_TOKENS": int,
         "DEBUG": str,
-        "VERBOSE": str
+        "VERBOSE": str,
+        "WEB_HOST": str,
+        "WEB_PORT": int,
+        "WEB_DEBUG": str,
+        "WEB_RELOAD": str,
+        "WEB_STATIC_FOLDER": str,
+        "WEB_MAX_QUEUE_SIZE": int,
+        "WEB_SSE_HEARTBEAT_INTERVAL": int
     }
     
     # Validate optional variables
@@ -207,6 +221,12 @@ def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]
                         invalid_vars[var] = "must be positive"
                     elif var == "GEMINI_MAX_OUTPUT_TOKENS" and parsed_value <= 0:
                         invalid_vars[var] = "must be positive"
+                    elif var == "WEB_PORT" and (parsed_value <= 0 or parsed_value > 65535):
+                        invalid_vars[var] = "must be between 1 and 65535"
+                    elif var == "WEB_MAX_QUEUE_SIZE" and parsed_value <= 0:
+                        invalid_vars[var] = "must be positive"
+                    elif var == "WEB_SSE_HEARTBEAT_INTERVAL" and parsed_value <= 0:
+                        invalid_vars[var] = "must be positive"
                     else:
                         env_vars[var] = value
                 elif var_type == float:
@@ -216,7 +236,7 @@ def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]
                     else:
                         env_vars[var] = value
                 elif var_type == str:
-                    if var in ["DEBUG", "VERBOSE"] and value.lower() not in ["true", "false"]:
+                    if var in ["DEBUG", "VERBOSE", "WEB_DEBUG", "WEB_RELOAD"] and value.lower() not in ["true", "false"]:
                         invalid_vars[var] = "must be 'true' or 'false'"
                     else:
                         env_vars[var] = value
@@ -231,7 +251,7 @@ def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]
     return env_vars
 
 
-def get_configuration_help(youtube_mode: bool = False) -> str:
+def get_configuration_help(youtube_mode: bool = False, web_mode: bool = False) -> str:
     """
     Get help text for configuration setup.
     
@@ -278,7 +298,21 @@ OPTIONAL VARIABLES:
     help_text += """
   DEBUG                     Enable debug mode (true/false, default: false)
   VERBOSE                   Enable verbose output (true/false, default: false)
-
+"""
+    
+    if web_mode:
+        help_text += """
+WEB SERVER CONFIGURATION (for --ui mode):
+  WEB_HOST                  Web server host (default: 127.0.0.1)
+  WEB_PORT                  Web server port (default: 8080)
+  WEB_DEBUG                 Enable web debug mode (true/false, default: false)
+  WEB_RELOAD                Enable auto-reload in development (true/false, default: false)
+  WEB_STATIC_FOLDER         Static files directory (default: web/static)
+  WEB_MAX_QUEUE_SIZE        Maximum queue size (default: 100)
+  WEB_SSE_HEARTBEAT_INTERVAL SSE heartbeat interval in seconds (default: 30)
+"""
+    
+    help_text += """
 SETUP:
   1. Copy .env.example to .env
   2. Edit .env and add your API keys
@@ -288,7 +322,7 @@ SETUP:
     return help_text
 
 
-def print_configuration_error(error: ConfigurationError, youtube_mode: bool = False):
+def print_configuration_error(error: ConfigurationError, youtube_mode: bool = False, web_mode: bool = False):
     """
     Print a user-friendly configuration error message.
     
@@ -311,7 +345,7 @@ def print_configuration_error(error: ConfigurationError, youtube_mode: bool = Fa
             print(f"  - {var}: {reason}")
         print()
     
-    print(get_configuration_help(youtube_mode))
+    print(get_configuration_help(youtube_mode, web_mode))
 
 
 def load_custom_prompt(prompt_file: Optional[str] = None) -> str:
