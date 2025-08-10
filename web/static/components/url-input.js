@@ -139,6 +139,7 @@ class UrlInput {
         try {
             // Call the main app's addQueueItem method
             await window.app.addQueueItem(url, customPrompt);
+            this.setLoading(false);
             this.showSuccess('URL added to queue successfully!');
             
             // Hide modal after short delay to show success message

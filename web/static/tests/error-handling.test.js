@@ -33,13 +33,13 @@ class MockQueueColumns {
     constructor() {
         this.errorMappings = [
             {
-                pattern: /invalid.*url/i,
-                message: 'Invalid YouTube URL',
+                pattern: /invalid.*url|invalid.*format|url.*not.*valid/i,
+                message: 'URL is not valid',
                 context: 'Please check the URL format'
             },
             {
                 pattern: /network.*error|connection.*error|timeout/i,
-                message: 'Network connection error',
+                message: 'network connection failed',
                 context: 'Check your internet connection'
             },
             {
@@ -49,7 +49,7 @@ class MockQueueColumns {
             },
             {
                 pattern: /video.*not.*found|404/i,
-                message: 'Video not found',
+                message: 'video not available',
                 context: 'Video may be private or deleted'
             },
             {
@@ -59,18 +59,23 @@ class MockQueueColumns {
             },
             {
                 pattern: /processing.*failed|summary.*generation.*error/i,
-                message: 'AI processing failed',
+                message: 'processing error occurred',
                 context: 'Try again or contact support'
             },
             {
                 pattern: /storage.*error|notion.*error/i,
-                message: 'Storage error',
+                message: 'storage operation failed',
                 context: 'Check Notion integration'
             },
             {
                 pattern: /server.*error|internal.*error/i,
                 message: 'Server error',
                 context: 'Please try again later'
+            },
+            {
+                pattern: /TypeError|ReferenceError|SyntaxError|NetworkError/i,
+                message: 'Application error occurred',
+                context: 'Please refresh the page and try again'
             }
         ];
     }
@@ -623,7 +628,7 @@ describe('Error Recovery Scenarios', () => {
             const displayText = queueColumns.getErrorDisplayText(error);
             
             // Should not contain technical jargon (except for the test case that includes it)
-            if (!errorMessage.includes('TypeError')) {
+            if (!error.includes('TypeError')) {
                 expect(displayText).not.toMatch(/TypeError|ReferenceError|SyntaxError/);
             }
             

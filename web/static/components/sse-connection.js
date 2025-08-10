@@ -18,6 +18,10 @@ class SSEConnection {
         this.heartbeatTimer = null;
         this.lastHeartbeat = null;
         
+        // Debouncing for status updates
+        this.updateDebounceTimer = null;
+        this.pendingUpdates = new Map();
+        
         // Event handlers
         this.eventHandlers = {
             'queue_status': this.handleQueueStatus.bind(this),
@@ -78,6 +82,13 @@ class SSEConnection {
         this.isConnected = false;
         this.clearReconnectTimer();
         this.clearHeartbeatTimer();
+        
+        // Clear debounce timer and pending updates
+        if (this.updateDebounceTimer) {
+            clearTimeout(this.updateDebounceTimer);
+            this.updateDebounceTimer = null;
+        }
+        this.pendingUpdates.clear();
     }
 
     /**
@@ -180,17 +191,61 @@ class SSEConnection {
             const item = data.data.item;
             const itemId = data.data.item_id;
             
-            // Determine old and new status for animation
-            const newStatus = this.mapStatusToColumn(item.status);
-            const oldStatus = this.findItemCurrentColumn(itemId);
+            // Store the latest update for this item
+            this.pendingUpdates.set(itemId, { item, timestamp: Date.now() });
             
-            if (oldStatus && oldStatus !== newStatus) {
-                // Animate item movement between columns
-                this.animateItemMovement(itemId, oldStatus, newStatus, item);
-            } else {
-                // Update item in place
-                this.updateItemInPlace(itemId, item);
-            }
+            // Debounce updates to prevent rapid-fire changes
+            this.debouncedProcessUpdates();
+        }
+    }
+
+    /**
+     * Process pending updates with debouncing
+     */
+    debouncedProcessUpdates() {
+        if (this.updateDebounceTimer) {
+            clearTimeout(this.updateDebounceTimer);
+        }
+        
+        this.updateDebounceTimer = setTimeout(() => {
+            this.processPendingUpdates();
+        }, 100); // 100ms debounce
+    }
+
+    /**
+     * Process all pending updates
+     */
+    processPendingUpdates() {
+        const updates = Array.from(this.pendingUpdates.entries());
+        this.pendingUpdates.clear();
+        
+        for (const [itemId, { item }] of updates) {
+            this.processItemUpdate(itemId, item);
+        }
+        
+        // Update counters once after all updates
+        this.updateColumnCounters();
+    }
+
+    /**
+     * Process a single item update
+     */
+    processItemUpdate(itemId, item) {
+        // Determine old and new status for animation
+        const newStatus = this.mapStatusToColumn(item.status);
+        const oldStatus = this.findItemCurrentColumn(itemId);
+        
+        console.log(`SSEConnection: Item ${itemId} status change: ${oldStatus} -> ${newStatus}`);
+        
+        if (oldStatus && oldStatus !== newStatus) {
+            // Remove item from old column first to prevent duplicates
+            this.removeItemFromColumn(itemId, oldStatus);
+            
+            // Add item to new column
+            this.addItemToColumn(itemId, newStatus, item);
+        } else {
+            // Update item in place
+            this.updateItemInPlace(itemId, item);
         }
     }
 
@@ -325,6 +380,54 @@ class SSEConnection {
                 }, 50);
             }, 100);
         }
+    }
+
+    /**
+     * Remove item from a specific column
+     */
+    removeItemFromColumn(itemId, columnName) {
+        const columnElement = document.getElementById(`${columnName}-items`);
+        const itemElement = columnElement?.querySelector(`[data-item-id="${itemId}"]`);
+        
+        if (itemElement) {
+            console.log(`SSEConnection: Removing item ${itemId} from ${columnName} column`);
+            itemElement.remove();
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Add item to a specific column
+     */
+    addItemToColumn(itemId, columnName, itemData) {
+        const columnElement = document.getElementById(`${columnName}-items`);
+        
+        if (columnElement) {
+            console.log(`SSEConnection: Adding item ${itemId} to ${columnName} column`);
+            
+            const queueColumns = this.app.getComponent('queueColumns');
+            if (queueColumns) {
+                const newItemElement = queueColumns.createQueueItemElement(itemData);
+                
+                // Add with fade-in animation
+                newItemElement.style.opacity = '0';
+                newItemElement.style.transform = 'translateY(-10px)';
+                columnElement.appendChild(newItemElement);
+                
+                // Animate in
+                setTimeout(() => {
+                    newItemElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    newItemElement.style.opacity = '1';
+                    newItemElement.style.transform = 'translateY(0)';
+                }, 50);
+                
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**

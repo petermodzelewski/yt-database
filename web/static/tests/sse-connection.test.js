@@ -139,7 +139,7 @@ describe('SSEConnection', () => {
             });
         });
         
-        test('should handle status change events', () => {
+        test('should handle status change events', async () => {
             // Add an item to the DOM first
             const todoItems = document.getElementById('todo-items');
             const itemElement = document.createElement('div');
@@ -159,14 +159,15 @@ describe('SSEConnection', () => {
                 }
             };
             
-            const animateItemMovementSpy = jest.spyOn(sseConnection, 'animateItemMovement');
+            const processItemUpdateSpy = jest.spyOn(sseConnection, 'processItemUpdate');
             
             sseConnection.eventSource.simulateMessage(statusChangeData);
             
-            expect(animateItemMovementSpy).toHaveBeenCalledWith(
+            // Wait for debounced update to process
+            await new Promise(resolve => setTimeout(resolve, 150));
+            
+            expect(processItemUpdateSpy).toHaveBeenCalledWith(
                 'test-item',
-                'todo',
-                'in-progress',
                 statusChangeData.data.item
             );
         });
