@@ -589,7 +589,9 @@ class QueueManager:
                 if hasattr(chat_logger, 'get_latest_log_path'):
                     item = self.get_item_status(item_id)
                     if item:
-                        item.chat_log_path = chat_logger.get_latest_log_path()
+                        # Pass video_id to get the correct main log file (not chunk logs)
+                        video_id = metadata.get('video_id', 'unknown')
+                        item.chat_log_path = chat_logger.get_latest_log_path(video_id)
                         self._notify_status_change(item_id, item)
             
             # Update final status based on success
@@ -677,13 +679,22 @@ class QueueManager:
             
             success = self.video_processor.storage.store_video_summary(video_data)
             
-            # Update chunk log paths if available
+            # Update chat log paths if available
             if hasattr(self.video_processor.summary_writer, 'chat_logger'):
                 chat_logger = self.video_processor.summary_writer.chat_logger
                 item = self.get_item_status(item_id)
-                if item and hasattr(chat_logger, 'get_chunk_log_paths'):
-                    chunk_logs = chat_logger.get_chunk_log_paths(metadata.get('video_id', 'unknown'))
-                    item.chunk_logs = chunk_logs
+                if item:
+                    video_id = metadata.get('video_id', 'unknown')
+                    
+                    # Set main chat log path
+                    if hasattr(chat_logger, 'get_latest_log_path'):
+                        item.chat_log_path = chat_logger.get_latest_log_path(video_id)
+                    
+                    # Set chunk log paths
+                    if hasattr(chat_logger, 'get_chunk_log_paths'):
+                        chunk_logs = chat_logger.get_chunk_log_paths(video_id)
+                        item.chunk_logs = chunk_logs
+                    
                     self._notify_status_change(item_id, item)
             
             # Update final status based on success

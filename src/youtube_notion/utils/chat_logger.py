@@ -233,20 +233,27 @@ class ChatLogger:
     
     def get_latest_log_path(self, video_id: Optional[str] = None) -> Optional[str]:
         """
-        Get the path to the most recent log file.
+        Get the path to the most recent main log file (excludes chunk logs).
         
         Args:
             video_id: Optional video ID to filter by
             
         Returns:
-            Optional[str]: Path to the latest log file, or None if no logs exist
+            Optional[str]: Path to the latest main log file, or None if no logs exist
         """
         log_files = self.get_log_files(video_id)
+        
         if not log_files:
             return None
         
+        # Filter out chunk logs (files containing "_chunk_")
+        main_log_files = [f for f in log_files if "_chunk_" not in f.name]
+        
+        if not main_log_files:
+            return None
+        
         # Sort by modification time (newest first)
-        latest_file = max(log_files, key=lambda f: f.stat().st_mtime)
+        latest_file = max(main_log_files, key=lambda f: f.stat().st_mtime)
         return str(latest_file)
     
     def get_chunk_log_paths(self, video_id: str) -> list:

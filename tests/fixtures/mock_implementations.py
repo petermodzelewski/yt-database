@@ -1050,9 +1050,12 @@ class MockChatLogger:
         self.log_files = []
         self.chunk_log_files = []
         
-    def get_latest_log_path(self) -> str:
+    def get_latest_log_path(self, video_id: str = None) -> str:
         """
         Get the path to the latest chat log file.
+        
+        Args:
+            video_id: Optional video ID (ignored in mock)
         
         Returns:
             str: Path to the latest chat log file
