@@ -75,11 +75,26 @@ class NotionConfig:
 
 
 @dataclass
+class FileStorageConfig:
+    """Configuration for file system storage."""
+
+    output_dir: str
+    use_channel_subdirectory: bool = True
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if not self.output_dir:
+            raise ValueError("Output directory is required for file storage")
+
+
+@dataclass
 class ApplicationConfig:
     """Main application configuration."""
     
     # Component configurations
-    notion: NotionConfig
+    storage_backends: List[str] = field(default_factory=lambda: ["notion"])
+    notion: Optional[NotionConfig] = None
+    file_storage: Optional[FileStorageConfig] = None
     youtube_processor: Optional[YouTubeProcessorConfig] = None
     web_server: Optional[WebServerConfig] = None
     
@@ -115,12 +130,30 @@ class ApplicationConfig:
         # Validate and collect environment variables
         env_vars = validate_environment_variables(youtube_mode)
         
-        # Create Notion configuration
-        notion_config = NotionConfig(
-            notion_token=env_vars["NOTION_TOKEN"],
-            database_name=env_vars.get("DATABASE_NAME", "YT Summaries"),
-            parent_page_name=env_vars.get("PARENT_PAGE_NAME", "YouTube Knowledge Base")
-        )
+        # Determine which storage backends are enabled
+        storage_backends_str = env_vars.get("STORAGE_BACKENDS", "notion")
+        storage_backends = [b.strip() for b in storage_backends_str.split(',')]
+
+        # Create Notion configuration if enabled
+        notion_config = None
+        if "notion" in storage_backends:
+            if "NOTION_TOKEN" not in env_vars:
+                raise ConfigurationError("NOTION_TOKEN is required when 'notion' storage backend is enabled")
+            notion_config = NotionConfig(
+                notion_token=env_vars["NOTION_TOKEN"],
+                database_name=env_vars.get("DATABASE_NAME", "YT Summaries"),
+                parent_page_name=env_vars.get("PARENT_PAGE_NAME", "YouTube Knowledge Base")
+            )
+
+        # Create FileStorage configuration if enabled
+        file_storage_config = None
+        if "file" in storage_backends:
+            if "FILE_STORAGE_OUTPUT_DIR" not in env_vars:
+                raise ConfigurationError("FILE_STORAGE_OUTPUT_DIR is required when 'file' storage backend is enabled")
+            file_storage_config = FileStorageConfig(
+                output_dir=env_vars["FILE_STORAGE_OUTPUT_DIR"],
+                use_channel_subdirectory=env_vars.get("FILE_STORAGE_USE_CHANNEL_SUBDIR", "true").lower() == "true"
+            )
         
         # Create YouTube processor configuration if needed
         youtube_config = None
@@ -143,7 +176,9 @@ class ApplicationConfig:
         
         # Create application configuration
         return cls(
+            storage_backends=storage_backends,
             notion=notion_config,
+            file_storage=file_storage_config,
             youtube_processor=youtube_config,
             web_server=web_config,
             debug=env_vars.get("DEBUG", "false").lower() == "true",
@@ -172,7 +207,7 @@ def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]
     invalid_vars = {}
     
     # Always required variables
-    required_vars = ["NOTION_TOKEN"]
+    required_vars = []
     
     # Required for YouTube processing mode
     if youtube_mode:
@@ -185,11 +220,28 @@ def validate_environment_variables(youtube_mode: bool = False) -> Dict[str, str]
             missing_vars.append(var)
         else:
             env_vars[var] = value
+
+    # Load all env vars to check dependencies
+    all_env_vars = {k: os.getenv(k) for k in os.environ}
+
+    # Conditional requirements for storage backends
+    storage_backends_str = all_env_vars.get("STORAGE_BACKENDS", "notion")
+    storage_backends = [b.strip() for b in storage_backends_str.split(',')]
     
+    if "notion" in storage_backends and not all_env_vars.get("NOTION_TOKEN"):
+        missing_vars.append("NOTION_TOKEN (for notion storage)")
+
+    if "file" in storage_backends and not all_env_vars.get("FILE_STORAGE_OUTPUT_DIR"):
+        missing_vars.append("FILE_STORAGE_OUTPUT_DIR (for file storage)")
+
     # Optional variables with validation
     optional_vars = {
+        "STORAGE_BACKENDS": str,
+        "NOTION_TOKEN": str,
         "DATABASE_NAME": str,
         "PARENT_PAGE_NAME": str,
+        "FILE_STORAGE_OUTPUT_DIR": str,
+        "FILE_STORAGE_USE_CHANNEL_SUBDIR": str,
         "YOUTUBE_API_KEY": str,
         "DEFAULT_SUMMARY_PROMPT": str,
         "YOUTUBE_PROCESSOR_MAX_RETRIES": int,
@@ -277,8 +329,16 @@ REQUIRED VARIABLES:
     
     help_text += """
 OPTIONAL VARIABLES:
+  STORAGE_BACKENDS          Comma-separated list of storage backends to use (e.g., "notion,file")
+                            (default: "notion")
+
+NOTION-SPECIFIC VARIABLES (if "notion" is in STORAGE_BACKENDS):
   DATABASE_NAME             Name of the Notion database (default: "YT Summaries")
   PARENT_PAGE_NAME          Name of the parent page (default: "Knowledge Base")
+
+FILE-SYSTEM-SPECIFIC VARIABLES (if "file" is in STORAGE_BACKENDS):
+  FILE_STORAGE_OUTPUT_DIR   Directory to save markdown files (e.g., "output/summaries")
+  FILE_STORAGE_USE_CHANNEL_SUBDIR  Create subdirectories for each channel (true/false, default: true)
 """
     
     if youtube_mode:

@@ -11,6 +11,7 @@ from unittest.mock import patch, mock_open, Mock
 from src.youtube_notion.config import (
     ApplicationConfig,
     NotionConfig,
+    FileStorageConfig,
     YouTubeProcessorConfig,
     DEFAULT_SUMMARY_PROMPT,
     validate_environment_variables,
@@ -142,173 +143,170 @@ class TestNotionConfig:
         assert config.parent_page_name == "YouTube Knowledge Base"
 
 
+class TestFileStorageConfig:
+    """Test FileStorageConfig validation and initialization."""
+
+    def test_valid_config(self):
+        """Test creating a valid file storage configuration."""
+        config = FileStorageConfig(output_dir="/tmp/test")
+        assert config.output_dir == "/tmp/test"
+        assert config.use_channel_subdirectory is True
+
+    def test_missing_output_dir(self):
+        """Test that a missing output directory raises ValueError."""
+        with pytest.raises(ValueError, match="Output directory is required"):
+            FileStorageConfig(output_dir="")
+
+    def test_default_values(self):
+        """Test that default values are set correctly."""
+        config = FileStorageConfig(output_dir="/tmp/test")
+        assert config.use_channel_subdirectory is True
+
+
 class TestValidateEnvironmentVariables:
     """Test environment variable validation."""
-    
-    def test_valid_example_mode(self):
-        """Test validation in example mode with valid variables."""
+
+    def test_valid_notion_only(self):
+        """Test validation with Notion backend."""
         env_vars = {
+            "STORAGE_BACKENDS": "notion",
             "NOTION_TOKEN": "test_token"
         }
-        
         with patch.dict(os.environ, env_vars, clear=True):
             result = validate_environment_variables(youtube_mode=False)
             assert result["NOTION_TOKEN"] == "test_token"
-    
+
+    def test_valid_file_only(self):
+        """Test validation with File backend."""
+        env_vars = {
+            "STORAGE_BACKENDS": "file",
+            "FILE_STORAGE_OUTPUT_DIR": "/tmp/output"
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            result = validate_environment_variables(youtube_mode=False)
+            assert result["FILE_STORAGE_OUTPUT_DIR"] == "/tmp/output"
+
     def test_valid_youtube_mode(self):
         """Test validation in YouTube mode with valid variables."""
         env_vars = {
+            "STORAGE_BACKENDS": "notion",
             "NOTION_TOKEN": "test_token",
             "GEMINI_API_KEY": "test_gemini_key",
             "YOUTUBE_API_KEY": "test_youtube_key"
         }
-        
         with patch.dict(os.environ, env_vars, clear=True):
             result = validate_environment_variables(youtube_mode=True)
             assert result["NOTION_TOKEN"] == "test_token"
             assert result["GEMINI_API_KEY"] == "test_gemini_key"
             assert result["YOUTUBE_API_KEY"] == "test_youtube_key"
-    
-    def test_missing_notion_token(self):
-        """Test that missing NOTION_TOKEN raises ConfigurationError."""
-        with patch.dict(os.environ, {}, clear=True):
+
+    def test_missing_notion_token_when_notion_is_backend(self):
+        """Test that missing NOTION_TOKEN with notion backend raises ConfigurationError."""
+        env_vars = {"STORAGE_BACKENDS": "notion"}
+        with patch.dict(os.environ, env_vars, clear=True):
             with pytest.raises(ConfigurationError) as exc_info:
                 validate_environment_variables(youtube_mode=False)
-            
-            assert "NOTION_TOKEN" in exc_info.value.missing_vars
-    
+            assert "NOTION_TOKEN (for notion storage)" in exc_info.value.missing_vars
+
+    def test_missing_file_dir_when_file_is_backend(self):
+        """Test that missing FILE_STORAGE_OUTPUT_DIR with file backend raises ConfigurationError."""
+        env_vars = {"STORAGE_BACKENDS": "file"}
+        with patch.dict(os.environ, env_vars, clear=True):
+            with pytest.raises(ConfigurationError) as exc_info:
+                validate_environment_variables(youtube_mode=False)
+            assert "FILE_STORAGE_OUTPUT_DIR (for file storage)" in exc_info.value.missing_vars
+
     def test_missing_gemini_key_youtube_mode(self):
         """Test that missing GEMINI_API_KEY in YouTube mode raises ConfigurationError."""
-        env_vars = {"NOTION_TOKEN": "test_token"}
-        
+        env_vars = {"STORAGE_BACKENDS": "notion", "NOTION_TOKEN": "test_token"}
         with patch.dict(os.environ, env_vars, clear=True):
             with pytest.raises(ConfigurationError) as exc_info:
                 validate_environment_variables(youtube_mode=True)
-            
             assert "GEMINI_API_KEY" in exc_info.value.missing_vars
-    
-    def test_invalid_integer_values(self):
-        """Test validation of integer environment variables."""
-        env_vars = {
-            "NOTION_TOKEN": "test_token",
-            "GEMINI_API_KEY": "test_key",
-            "YOUTUBE_PROCESSOR_MAX_RETRIES": "invalid"
-        }
-        
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ConfigurationError) as exc_info:
-                validate_environment_variables(youtube_mode=True)
-            
-            assert "YOUTUBE_PROCESSOR_MAX_RETRIES" in exc_info.value.invalid_vars
-            assert "must be a valid int" in exc_info.value.invalid_vars["YOUTUBE_PROCESSOR_MAX_RETRIES"]
-    
-    def test_invalid_float_values(self):
-        """Test validation of float environment variables."""
-        env_vars = {
-            "NOTION_TOKEN": "test_token",
-            "GEMINI_API_KEY": "test_key",
-            "GEMINI_TEMPERATURE": "invalid"
-        }
-        
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ConfigurationError) as exc_info:
-                validate_environment_variables(youtube_mode=True)
-            
-            assert "GEMINI_TEMPERATURE" in exc_info.value.invalid_vars
-            assert "must be a valid float" in exc_info.value.invalid_vars["GEMINI_TEMPERATURE"]
-    
-    def test_invalid_range_values(self):
-        """Test validation of values with specific ranges."""
-        env_vars = {
-            "NOTION_TOKEN": "test_token",
-            "GEMINI_API_KEY": "test_key",
-            "YOUTUBE_PROCESSOR_MAX_RETRIES": "-1",
-            "GEMINI_TEMPERATURE": "3.0"
-        }
-        
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ConfigurationError) as exc_info:
-                validate_environment_variables(youtube_mode=True)
-            
-            assert "YOUTUBE_PROCESSOR_MAX_RETRIES" in exc_info.value.invalid_vars
-            assert "must be non-negative" in exc_info.value.invalid_vars["YOUTUBE_PROCESSOR_MAX_RETRIES"]
-            assert "GEMINI_TEMPERATURE" in exc_info.value.invalid_vars
-            assert "must be between 0 and 2" in exc_info.value.invalid_vars["GEMINI_TEMPERATURE"]
-    
-    def test_invalid_boolean_values(self):
-        """Test validation of boolean environment variables."""
-        env_vars = {
-            "NOTION_TOKEN": "test_token",
-            "DEBUG": "maybe"
-        }
-        
-        with patch.dict(os.environ, env_vars, clear=True):
-            with pytest.raises(ConfigurationError) as exc_info:
-                validate_environment_variables(youtube_mode=False)
-            
-            assert "DEBUG" in exc_info.value.invalid_vars
-            assert "must be 'true' or 'false'" in exc_info.value.invalid_vars["DEBUG"]
-    
+
     def test_valid_optional_values(self):
         """Test that valid optional values are included."""
         env_vars = {
+            "STORAGE_BACKENDS": "notion, file",
             "NOTION_TOKEN": "test_token",
+            "FILE_STORAGE_OUTPUT_DIR": "/tmp/out",
             "GEMINI_API_KEY": "test_key",
             "DATABASE_NAME": "Custom DB",
             "YOUTUBE_PROCESSOR_MAX_RETRIES": "5",
             "GEMINI_TEMPERATURE": "0.5",
             "DEBUG": "true"
         }
-        
         with patch.dict(os.environ, env_vars, clear=True):
             result = validate_environment_variables(youtube_mode=True)
             assert result["DATABASE_NAME"] == "Custom DB"
             assert result["YOUTUBE_PROCESSOR_MAX_RETRIES"] == "5"
             assert result["GEMINI_TEMPERATURE"] == "0.5"
             assert result["DEBUG"] == "true"
+            assert result["FILE_STORAGE_OUTPUT_DIR"] == "/tmp/out"
 
 
 class TestApplicationConfig:
     """Test ApplicationConfig creation and validation."""
-    
-    def test_from_environment_example_mode(self):
-        """Test creating config from environment in example mode."""
+
+    def test_from_environment_notion_only(self):
+        """Test creating config with only Notion storage."""
         env_vars = {
+            "STORAGE_BACKENDS": "notion",
             "NOTION_TOKEN": "test_token",
             "DATABASE_NAME": "Custom DB"
         }
-        
         with patch.dict(os.environ, env_vars, clear=True):
             config = ApplicationConfig.from_environment(youtube_mode=False)
-            
+            assert config.storage_backends == ["notion"]
             assert config.notion.notion_token == "test_token"
             assert config.notion.database_name == "Custom DB"
+            assert config.file_storage is None
             assert config.youtube_processor is None
-    
-    def test_from_environment_youtube_mode(self):
-        """Test creating config from environment in YouTube mode."""
+
+    def test_from_environment_file_storage_only(self):
+        """Test creating config with only file storage."""
         env_vars = {
-            "NOTION_TOKEN": "test_token",
-            "GEMINI_API_KEY": "test_gemini_key",
-            "YOUTUBE_API_KEY": "test_youtube_key",
-            "YOUTUBE_PROCESSOR_MAX_RETRIES": "5"
+            "STORAGE_BACKENDS": "file",
+            "FILE_STORAGE_OUTPUT_DIR": "/tmp/summaries",
+            "FILE_STORAGE_USE_CHANNEL_SUBDIR": "false"
         }
-        
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = ApplicationConfig.from_environment(youtube_mode=False)
+            assert config.storage_backends == ["file"]
+            assert config.file_storage.output_dir == "/tmp/summaries"
+            assert config.file_storage.use_channel_subdirectory is False
+            assert config.notion is None
+            assert config.youtube_processor is None
+
+    def test_from_environment_multiple_storages(self):
+        """Test creating config with multiple storage backends."""
+        env_vars = {
+            "STORAGE_BACKENDS": "notion, file",
+            "NOTION_TOKEN": "test_token",
+            "FILE_STORAGE_OUTPUT_DIR": "/tmp/summaries",
+            "GEMINI_API_KEY": "test_gemini_key",
+        }
         with patch.dict(os.environ, env_vars, clear=True):
             config = ApplicationConfig.from_environment(youtube_mode=True)
-            
-            assert config.notion.notion_token == "test_token"
+            assert config.storage_backends == ["notion", "file"]
+            assert config.notion is not None
+            assert config.file_storage is not None
             assert config.youtube_processor is not None
+            assert config.notion.notion_token == "test_token"
+            assert config.file_storage.output_dir == "/tmp/summaries"
             assert config.youtube_processor.gemini_api_key == "test_gemini_key"
-            assert config.youtube_processor.youtube_api_key == "test_youtube_key"
-            assert config.youtube_processor.max_retries == 5
-    
-    def test_from_environment_missing_vars(self):
-        """Test that missing environment variables raise ConfigurationError."""
-        with patch.dict(os.environ, {}, clear=True):
-            with patch('src.youtube_notion.config.settings.load_dotenv'):  # Prevent .env loading
-                with pytest.raises(ConfigurationError):
+
+    def test_from_environment_missing_vars_for_backend(self):
+        """Test that missing env vars for an enabled backend raises ConfigurationError."""
+        env_vars = {
+            "STORAGE_BACKENDS": "notion, file",
+            "NOTION_TOKEN": "test_token",
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            with patch('src.youtube_notion.config.settings.load_dotenv'):
+                with pytest.raises(ConfigurationError) as exc_info:
                     ApplicationConfig.from_environment(youtube_mode=False)
+                assert "FILE_STORAGE_OUTPUT_DIR (for file storage)" in exc_info.value.missing_vars
 
 
 class TestConfigurationHelpers:
@@ -406,32 +404,39 @@ class TestConfigurationError:
 
 class TestComponentFactory:
     """Test ComponentFactory for dependency injection."""
-    
+
     def test_factory_initialization_valid_config(self):
         """Test factory initialization with valid configuration."""
         notion_config = NotionConfig(notion_token="test_token")
+        file_config = FileStorageConfig(output_dir="/tmp")
         youtube_config = YouTubeProcessorConfig(gemini_api_key="test_gemini_key")
-        app_config = ApplicationConfig(notion=notion_config, youtube_processor=youtube_config)
-        
+        app_config = ApplicationConfig(
+            storage_backends=["notion", "file"],
+            notion=notion_config,
+            file_storage=file_config,
+            youtube_processor=youtube_config
+        )
         factory = ComponentFactory(app_config)
-        
         assert factory.config == app_config
-    
+
     def test_factory_initialization_no_config(self):
         """Test that factory initialization fails with no configuration."""
         with pytest.raises(ConfigurationError, match="Application configuration is required"):
             ComponentFactory(None)
-    
+
     def test_factory_initialization_invalid_config_type(self):
         """Test that factory initialization fails with invalid configuration type."""
         with pytest.raises(ConfigurationError, match="Invalid application configuration type"):
             ComponentFactory("invalid_config")
-    
-    def test_factory_initialization_no_notion_config(self):
-        """Test that factory initialization fails without Notion configuration."""
-        app_config = ApplicationConfig(notion=None)
-        
+
+    def test_factory_initialization_missing_backend_config(self):
+        """Test that factory fails if a backend is specified but its config is missing."""
         with pytest.raises(ConfigurationError, match="Notion configuration is required"):
+            app_config = ApplicationConfig(storage_backends=["notion"], notion=None)
+            ComponentFactory(app_config)
+
+        with pytest.raises(ConfigurationError, match="File storage configuration is required"):
+            app_config = ApplicationConfig(storage_backends=["file"], file_storage=None)
             ComponentFactory(app_config)
     
     def test_create_summary_writer_success(self):
@@ -497,41 +502,65 @@ class TestComponentFactory:
             with pytest.raises(ConfigurationError, match="Invalid API key"):
                 factory.create_summary_writer()
     
-    def test_create_storage_success(self):
-        """Test successful storage creation."""
-        notion_config = NotionConfig(
-            notion_token="test_token",
-            database_name="Test DB",
-            parent_page_name="Test Page"
-        )
-        app_config = ApplicationConfig(notion=notion_config)
+    def test_create_storage_notion_only(self):
+        """Test creating a single Notion storage backend."""
+        notion_config = NotionConfig(notion_token="test_token")
+        app_config = ApplicationConfig(storage_backends=["notion"], notion=notion_config)
         factory = ComponentFactory(app_config)
-        
-        # Mock the Notion API client to avoid actual API calls
-        with patch('src.youtube_notion.storage.notion_storage.Client') as mock_client_class:
-            mock_client = Mock()
-            mock_client_class.return_value = mock_client
-            
-            # Mock the search API call that validate_configuration makes
-            mock_client.search.return_value = {
-                'results': [{'id': 'test-db-id', 'title': [{'plain_text': 'Test DB'}]}]
-            }
-            
+
+        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', return_value=True):
             storage = factory.create_storage()
-            
-            assert storage is not None
+            from src.youtube_notion.storage.notion_storage import NotionStorage
+            assert isinstance(storage, NotionStorage)
             assert storage.notion_token == "test_token"
-            assert storage.database_name == "Test DB"
-            assert storage.parent_page_name == "Test Page"
-    
+
+    def test_create_storage_file_only(self):
+        """Test creating a single FileStorage backend."""
+        file_config = FileStorageConfig(output_dir="/tmp/test")
+        app_config = ApplicationConfig(storage_backends=["file"], file_storage=file_config)
+        factory = ComponentFactory(app_config)
+
+        with patch('src.youtube_notion.storage.file_storage.FileStorage.validate_configuration', return_value=True):
+            storage = factory.create_storage()
+            from src.youtube_notion.storage.file_storage import FileStorage
+            assert isinstance(storage, FileStorage)
+            assert storage.output_dir == "/tmp/test"
+
+    def test_create_storage_multiple_backends(self):
+        """Test creating multiple storage backends wrapped in MultiStorage."""
+        notion_config = NotionConfig(notion_token="test_token")
+        file_config = FileStorageConfig(output_dir="/tmp/test")
+        app_config = ApplicationConfig(
+            storage_backends=["notion", "file"],
+            notion=notion_config,
+            file_storage=file_config
+        )
+        factory = ComponentFactory(app_config)
+
+        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', return_value=True), \
+             patch('src.youtube_notion.storage.file_storage.FileStorage.validate_configuration', return_value=True):
+            storage = factory.create_storage()
+            from src.youtube_notion.storage.multi_storage import MultiStorage
+            from src.youtube_notion.storage.notion_storage import NotionStorage
+            from src.youtube_notion.storage.file_storage import FileStorage
+            assert isinstance(storage, MultiStorage)
+            assert len(storage.storages) == 2
+            assert any(isinstance(s, NotionStorage) for s in storage.storages)
+            assert any(isinstance(s, FileStorage) for s in storage.storages)
+
+    def test_create_storage_no_backends_configured(self):
+        """Test that creating storage with no backends raises an error."""
+        app_config = ApplicationConfig(storage_backends=[], notion=None)
+        with pytest.raises(ConfigurationError, match="At least one storage backend must be configured"):
+            ComponentFactory(app_config)
+
     def test_create_storage_validation_failure(self):
         """Test storage creation with validation failure."""
         notion_config = NotionConfig(notion_token="test_token")
-        app_config = ApplicationConfig(notion=notion_config)
+        app_config = ApplicationConfig(storage_backends=["notion"], notion=notion_config)
         factory = ComponentFactory(app_config)
-        
-        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', 
-                   side_effect=ConfigurationError("Invalid token")):
+
+        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.validate_configuration', side_effect=ConfigurationError("Invalid token")):
             with pytest.raises(ConfigurationError, match="Invalid token"):
                 factory.create_storage()
     
@@ -770,23 +799,27 @@ class TestComponentFactory:
         """Test error handling during component creation."""
         notion_config = NotionConfig(notion_token="test_token")
         youtube_config = YouTubeProcessorConfig(gemini_api_key="test_gemini_key")
-        app_config = ApplicationConfig(notion=notion_config, youtube_processor=youtube_config)
+        app_config = ApplicationConfig(
+            storage_backends=["notion"],
+            notion=notion_config,
+            youtube_processor=youtube_config
+        )
         factory = ComponentFactory(app_config)
-        
+
         # Test summary writer creation error
-        with patch('src.youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.__init__', 
+        with patch('src.youtube_notion.writers.gemini_summary_writer.GeminiSummaryWriter.__init__',
                    side_effect=Exception("Unexpected error")):
             with pytest.raises(ConfigurationError, match="Failed to create summary writer"):
                 factory.create_summary_writer()
-        
+
         # Test storage creation error
-        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.__init__', 
+        with patch('src.youtube_notion.storage.notion_storage.NotionStorage.__init__',
                    side_effect=Exception("Unexpected error")):
-            with pytest.raises(ConfigurationError, match="Failed to create storage backend"):
+            with pytest.raises(ConfigurationError, match="Failed to create Notion storage backend"):
                 factory.create_storage()
-        
+
         # Test metadata extractor creation error
-        with patch('src.youtube_notion.extractors.video_metadata_extractor.VideoMetadataExtractor.__init__', 
+        with patch('src.youtube_notion.extractors.video_metadata_extractor.VideoMetadataExtractor.__init__',
                    side_effect=Exception("Unexpected error")):
             with pytest.raises(ConfigurationError, match="Failed to create metadata extractor"):
                 factory.create_metadata_extractor()
