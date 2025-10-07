@@ -8,6 +8,7 @@ default values, and environment variable handling.
 from .settings import (
     ApplicationConfig,
     NotionConfig,
+    FileStorageConfig,
     YouTubeProcessorConfig,
     validate_environment_variables,
     get_configuration_help,
@@ -19,7 +20,8 @@ from .factory import ComponentFactory
 
 __all__ = [
     'ApplicationConfig',
-    'NotionConfig', 
+    'NotionConfig',
+    'FileStorageConfig',
     'YouTubeProcessorConfig',
     'DEFAULT_SUMMARY_PROMPT',
     'validate_environment_variables',

@@ -11,13 +11,15 @@ from typing import TYPE_CHECKING
 
 from ..interfaces.storage import Storage
 from ..utils.chat_logger import ChatLogger
-from .settings import ApplicationConfig, YouTubeProcessorConfig, NotionConfig
+from .settings import ApplicationConfig, YouTubeProcessorConfig, NotionConfig, FileStorageConfig
 from ..utils.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
     from ..extractors.video_metadata_extractor import VideoMetadataExtractor
     from ..writers.gemini_summary_writer import GeminiSummaryWriter
     from ..storage.notion_storage import NotionStorage
+    from ..storage.file_storage import FileStorage
+    from ..storage.multi_storage import MultiStorage
 
 
 class ComponentFactory:
@@ -98,56 +100,77 @@ class ComponentFactory:
     
     def create_storage(self) -> Storage:
         """
-        Create a configured storage backend implementation.
+        Create configured storage backend implementations based on configuration.
         
-        Currently supports:
-        - NotionStorage: Stores video summaries in Notion databases
+        This method reads the `storage_backends` from the configuration and
+        creates the necessary storage instances. If multiple backends are
+        configured, it wraps them in a `MultiStorage` instance.
         
         Returns:
-            Storage: Configured storage backend instance
+            Storage: A configured storage backend instance (could be MultiStorage)
             
         Raises:
-            ConfigurationError: If storage configuration is invalid
+            ConfigurationError: If storage configuration is invalid or no backends are specified
         """
-        if not self.config.notion:
-            raise ConfigurationError(
-                "Notion configuration is required for storage creation"
-            )
+        storage_instances = []
         
-        notion_config = self.config.notion
+        # Get retry and timeout settings, with defaults
+        max_retries = self.config.youtube_processor.max_retries if self.config.youtube_processor else 3
+        timeout_seconds = self.config.youtube_processor.timeout_seconds if self.config.youtube_processor else 30
         
-        try:
-            # Get retry configuration from YouTube processor config if available
-            max_retries = 3  # Default
-            timeout_seconds = 30  # Default
-            
-            if self.config.youtube_processor:
-                max_retries = self.config.youtube_processor.max_retries
-                timeout_seconds = self.config.youtube_processor.timeout_seconds
-            
-            # Import locally to avoid circular imports
-            from ..storage.notion_storage import NotionStorage
-            
-            # Create NotionStorage with configuration
-            storage = NotionStorage(
-                notion_token=notion_config.notion_token,
-                database_name=notion_config.database_name,
-                parent_page_name=notion_config.parent_page_name,
-                max_retries=max_retries,
-                timeout_seconds=timeout_seconds
-            )
-            
-            # Validate the created storage backend
-            storage.validate_configuration()
-            
-            return storage
-            
-        except Exception as e:
-            if isinstance(e, ConfigurationError):
-                raise
+        # Create Notion storage if enabled
+        if "notion" in self.config.storage_backends:
+            try:
+                if not self.config.notion:
+                    raise ConfigurationError("Notion configuration is required for 'notion' storage backend")
+
+                from ..storage.notion_storage import NotionStorage
+                notion_storage = NotionStorage(
+                    notion_token=self.config.notion.notion_token,
+                    database_name=self.config.notion.database_name,
+                    parent_page_name=self.config.notion.parent_page_name,
+                    max_retries=max_retries,
+                    timeout_seconds=timeout_seconds
+                )
+                notion_storage.validate_configuration()
+                storage_instances.append(notion_storage)
+            except Exception as e:
+                if isinstance(e, ConfigurationError):
+                    raise
+                raise ConfigurationError(f"Failed to create Notion storage backend: {str(e)}")
+
+        # Create file storage if enabled
+        if "file" in self.config.storage_backends:
+            try:
+                if not self.config.file_storage:
+                    raise ConfigurationError("File storage configuration is required for 'file' storage backend")
+
+                from ..storage.file_storage import FileStorage
+                file_storage = FileStorage(
+                    output_dir=self.config.file_storage.output_dir,
+                    use_channel_subdirectory=self.config.file_storage.use_channel_subdirectory
+                )
+                file_storage.validate_configuration()
+                storage_instances.append(file_storage)
+            except Exception as e:
+                if isinstance(e, ConfigurationError):
+                    raise
+                raise ConfigurationError(f"Failed to create File storage backend: {str(e)}")
+
+        # Check if any storage backend was created
+        if not storage_instances:
             raise ConfigurationError(
-                f"Failed to create storage backend: {str(e)}"
+                "No storage backends configured.",
+                details="Please specify at least one storage backend in your configuration (e.g., 'notion', 'file')."
             )
+
+        # If there's only one storage backend, return it directly
+        if len(storage_instances) == 1:
+            return storage_instances[0]
+
+        # If multiple backends, wrap them in MultiStorage
+        from ..storage.multi_storage import MultiStorage
+        return MultiStorage(storage_instances)
     
     def create_metadata_extractor(self) -> 'VideoMetadataExtractor':
         """
@@ -266,11 +289,15 @@ class ComponentFactory:
                 details=f"Expected ApplicationConfig, got {type(self.config).__name__}"
             )
         
-        # Validate that we have at least Notion configuration
-        if not self.config.notion:
-            raise ConfigurationError(
-                "Notion configuration is required"
-            )
+        # Validate that we have at least one storage backend configured
+        if not self.config.storage_backends:
+            raise ConfigurationError("At least one storage backend must be configured")
+
+        if "notion" in self.config.storage_backends and not self.config.notion:
+            raise ConfigurationError("Notion configuration is required when 'notion' backend is enabled")
+
+        if "file" in self.config.storage_backends and not self.config.file_storage:
+            raise ConfigurationError("File storage configuration is required when 'file' backend is enabled")
     
     def _validate_summary_writer_config(self):
         """
@@ -305,22 +332,33 @@ class ComponentFactory:
     
     def _validate_storage_config(self):
         """
-        Validate storage configuration.
+        Validate storage configuration based on enabled backends.
         
         Raises:
-            ConfigurationError: If storage configuration is invalid
+            ConfigurationError: If any enabled storage configuration is invalid
         """
-        notion_config = self.config.notion
-        
-        # Validate required fields
-        if not notion_config.notion_token:
-            raise ConfigurationError("Notion token is required for storage")
-        
-        if not notion_config.database_name:
-            raise ConfigurationError("Database name is required for storage")
-        
-        if not notion_config.parent_page_name:
-            raise ConfigurationError("Parent page name is required for storage")
+        if not self.config.storage_backends:
+            raise ConfigurationError("No storage backends specified in configuration")
+
+        if "notion" in self.config.storage_backends:
+            if not self.config.notion:
+                raise ConfigurationError("Notion configuration is required for 'notion' backend")
+
+            notion_config = self.config.notion
+            if not notion_config.notion_token:
+                raise ConfigurationError("Notion token is required for Notion storage")
+            if not notion_config.database_name:
+                raise ConfigurationError("Database name is required for Notion storage")
+            if not notion_config.parent_page_name:
+                raise ConfigurationError("Parent page name is required for Notion storage")
+
+        if "file" in self.config.storage_backends:
+            if not self.config.file_storage:
+                raise ConfigurationError("File storage configuration is required for 'file' backend")
+
+            file_storage_config = self.config.file_storage
+            if not file_storage_config.output_dir:
+                raise ConfigurationError("Output directory is required for file storage")
     
     def _validate_metadata_extractor_config(self):
         """
@@ -381,12 +419,23 @@ class ComponentFactory:
             "factory_type": "ComponentFactory",
             "debug": self.config.debug,
             "verbose": self.config.verbose,
-            "notion": {
+            "storage_backends": self.config.storage_backends,
+            "notion": None,
+            "file_storage": None
+        }
+
+        if self.config.notion:
+            summary["notion"] = {
                 "database_name": self.config.notion.database_name,
                 "parent_page_name": self.config.notion.parent_page_name,
                 "token_configured": bool(self.config.notion.notion_token)
             }
-        }
+
+        if self.config.file_storage:
+            summary["file_storage"] = {
+                "output_dir": self.config.file_storage.output_dir,
+                "use_channel_subdirectory": self.config.file_storage.use_channel_subdirectory
+            }
         
         if self.config.youtube_processor:
             summary["youtube_processor"] = {
